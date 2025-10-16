@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "WhiteNoiseApp",
+    "slug": "WhiteNoiseApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "whitenoiseapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.admintaggd01.WhiteNoiseApp"
+    },
+
+    "android": {
+      "package": "com.admintaggd01.whitenoiseapp",          // REQUIRED for Play billing builds
+      "versionCode": 1,                                     // REQUIRED for Play uploads; bump on every release
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.admintaggd01.whitenoiseapp"
+    },
+
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "react-native-iap",         // adds BILLING permission & manifest bits
+      "expo-secure-store"
+    ],
+
+    "experiments": {
+      "typedRoutes": true
+    },
+
+    "extra": {
+      "router": {},
+      "eas": { "projectId": "7c23296f-b4e9-4dd4-ab36-53b654b8a2df" }
+    },
+
+    "owner": "admin-taggd-01"
+  }
+}
