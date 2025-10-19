@@ -5,6 +5,7 @@ import {
 } from "@/constants/sound";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
+import * as Haptics from "expo-haptics";
 
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useScroll } from "@/contexts/scroll";
@@ -1236,6 +1237,7 @@ export default function SoundsScreen() {
       isQuickPlaying && favoriteSoundId === String(soundItem.id);
 
     const handlePress = () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       Animated.sequence([
         Animated.timing(cardScale, {
           toValue: 0.95,
@@ -1360,7 +1362,10 @@ export default function SoundsScreen() {
                   borderColor: theme.border,
                 },
               ]}
-              onPress={() => setSelectedCategory(category)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setSelectedCategory(category);
+              }}
             >
               <Text
                 style={[

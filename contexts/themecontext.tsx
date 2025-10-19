@@ -6,87 +6,87 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 // White Noise App Color Palette
 export const themes = {
   dark: {
-    // Core backgrounds - deep, calming blues
-    background: "rgb(8, 15, 26)",
-    surface: "rgb(15, 23, 35)",
-    card: "rgb(20, 30, 45)",
+    // Core backgrounds - pure dark theme
+    background: "#0A0903",
+    surface: "#221E22",
+    card: "#221E22",
 
     // Borders and dividers - subtle contrast
-    border: "rgb(30, 41, 59)",
-    tabBarBorder: "rgb(25, 35, 50)",
+    border: "#2a2a3a",
+    tabBarBorder: "#2a2a3a",
 
     // Typography hierarchy
-    text: "rgb(248, 250, 252)",
-    textSecondary: "rgb(148, 163, 184)",
-    textMuted: "rgb(100, 116, 139)",
-    sectionHeader: "rgb(203, 213, 225)",
+    text: "#ffffff",
+    textSecondary: "#737373",
+    textMuted: "#737373",
+    sectionHeader: "#ffffff",
 
     // Interface elements
-    tabBar: "rgb(12, 20, 32)",
+    tabBar: "#0d0d0d",
 
-    // Accent colors - soothing and functional
-    primary: "rgb(59, 130, 246)", // Calming blue
-    secondary: "rgb(99, 102, 241)", // Soft indigo
-    accent: "rgb(16, 185, 129)", // Gentle teal
+    // Accent colors - electric mint theme
+    primary: "#59ac81ff",
+    secondary: "#ec4899",
+    accent: "#06b6d4",
 
     // Status colors
-    success: "rgb(34, 197, 94)",
-    warning: "rgb(251, 191, 36)",
-    error: "rgb(239, 68, 68)",
+    success: "#10b981",
+    warning: "#f59e0b",
+    error: "#ef4444",
 
-    // Sound category colors - nature inspired
-    rain: "rgb(59, 130, 246)", // Rain blue
-    ocean: "rgb(6, 182, 212)", // Ocean cyan
-    forest: "rgb(34, 197, 94)", // Forest green
-    fire: "rgb(251, 146, 60)", // Fire orange
-    night: "rgb(139, 92, 246)", // Night purple
-    urban: "rgb(156, 163, 175)", // Urban gray
+    // Sound category colors - vibrant tones
+    rain: "#3b82f6",
+    ocean: "#06b6d4",
+    forest: "#22c55e",
+    fire: "#f97316",
+    night: "#8b5cf6",
+    urban: "#6b7280",
 
     // Controls
-    switchTrackOff: "rgb(30, 41, 59)",
-    switchThumbOff: "rgb(71, 85, 105)",
+    switchTrackOff: "#2a2a3a",
+    switchThumbOff: "#737373",
   },
 
   light: {
-    // Core backgrounds - soft, clean whites
-    background: "rgb(250, 251, 252)",
-    surface: "rgb(248, 250, 252)",
-    card: "rgb(255, 255, 255)",
+    // Core backgrounds - clean whites
+    background: "#ffffff",
+    surface: "#f8fafc",
+    card: "#ffffff",
 
     // Borders and dividers
-    border: "rgb(226, 232, 240)",
-    tabBarBorder: "rgb(241, 245, 249)",
+    border: "#e2e8f0",
+    tabBarBorder: "#e2e8f0",
 
     // Typography hierarchy
-    text: "rgb(15, 23, 42)",
-    textSecondary: "rgb(71, 85, 105)",
-    textMuted: "rgb(100, 116, 139)",
-    sectionHeader: "rgb(30, 41, 59)",
+    text: "#0d0d0d",
+    textSecondary: "#737373",
+    textMuted: "#737373",
+    sectionHeader: "#0d0d0d",
 
     // Interface elements
-    tabBar: "rgb(255, 255, 255)",
+    tabBar: "#ffffff",
 
-    // Accent colors - vibrant but not harsh
-    primary: "rgb(37, 99, 235)", // Vibrant blue
-    secondary: "rgb(67, 56, 202)", // Rich indigo
-    accent: "rgb(5, 150, 105)", // Fresh teal
+    // Accent colors - electric mint theme
+    primary: "#00dc82",
+    secondary: "#ec4899",
+    accent: "#06b6d4",
 
     // Status colors
-    success: "rgb(22, 163, 74)",
-    warning: "rgb(217, 119, 6)",
-    error: "rgb(220, 38, 38)",
+    success: "#10b981",
+    warning: "#f59e0b",
+    error: "#ef4444",
 
-    // Sound category colors - vibrant nature tones
-    rain: "rgb(37, 99, 235)", // Rain blue
-    ocean: "rgb(8, 145, 178)", // Ocean blue
-    forest: "rgb(22, 163, 74)", // Forest green
-    fire: "rgb(234, 88, 12)", // Fire orange
-    night: "rgb(124, 58, 237)", // Night purple
-    urban: "rgb(75, 85, 99)", // Urban gray
+    // Sound category colors - vibrant tones
+    rain: "#3b82f6",
+    ocean: "#06b6d4",
+    forest: "#22c55e",
+    fire: "#f97316",
+    night: "#8b5cf6",
+    urban: "#6b7280",
 
     // Controls
-    switchTrackOff: "rgb(226, 232, 240)",
-    switchThumbOff: "rgb(148, 163, 184)",
+    switchTrackOff: "#e2e8f0",
+    switchThumbOff: "#737373",
   },
 };
 
