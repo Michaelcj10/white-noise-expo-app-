@@ -1,7 +1,13 @@
-import { WHITE_NOISE_SOUNDS } from "@/constants/sound";
+import {
+  SOUND_CATEGORIES,
+  SoundCategory,
+  WHITE_NOISE_SOUNDS,
+} from "@/constants/sound";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
-import { BlurView } from "expo-blur";
+
+import { useQuickPlay } from "@/contexts/quickplay";
+import { useScroll } from "@/contexts/scroll";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -831,6 +837,9 @@ export function Paywall({
 export default function SoundsScreen() {
   const { theme, themeMode } = useTheme();
   const { backgroundPlayEnabled } = useBackgroundPlay();
+  const { isQuickPlaying, favoriteSoundId } = useQuickPlay();
+  const { setScrollViewRef } = useScroll();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Multiple sounds support
   const [activeSounds, setActiveSounds] = useState<
@@ -844,6 +853,10 @@ export default function SoundsScreen() {
       }
     >
   >(new Map());
+
+  const [selectedCategory, setSelectedCategory] = useState<SoundCategory>(
+    SOUND_CATEGORIES.ALL
+  );
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [globalMuted, setGlobalMuted] = useState(false);
@@ -1219,6 +1232,8 @@ export default function SoundsScreen() {
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     const isActive = activeSounds.has(soundItem.id);
+    const isQuickPlayActive =
+      isQuickPlaying && favoriteSoundId === String(soundItem.id);
 
     const handlePress = () => {
       Animated.sequence([
@@ -1246,7 +1261,7 @@ export default function SoundsScreen() {
           style={[
             styles.soundCard,
             { backgroundColor: theme.surface, borderColor: theme.border },
-            isActive && {
+            (isActive || isQuickPlayActive) && {
               borderColor: theme.primary,
               backgroundColor: theme.card,
             },
@@ -1287,6 +1302,11 @@ export default function SoundsScreen() {
             >
               {soundItem.description}
             </Text>
+            {(isActive || isQuickPlayActive) && (
+              <Text style={[styles.playingText, { color: theme.primary }]}>
+                Playing
+              </Text>
+            )}
           </View>
 
           {locked ? (
@@ -1297,7 +1317,7 @@ export default function SoundsScreen() {
                 color={theme.textSecondary}
               />
             </View>
-          ) : isActive ? (
+          ) : isActive || isQuickPlayActive ? (
             <Animated.View
               style={[
                 styles.playingIndicator,
@@ -1324,49 +1344,65 @@ export default function SoundsScreen() {
         barStyle={themeMode === "dark" ? "light-content" : "dark-content"}
         backgroundColor={theme.background}
       />
-
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>White Noise</Text>
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Relax, Focus, Sleep
-        </Text>
-        <Text
-          style={[
-            styles.backgroundPlayIndicator,
-            { color: backgroundPlayEnabled ? theme.success : theme.textMuted },
-          ]}
-        >
-          {backgroundPlayEnabled
-            ? "Background Play Enabled"
-            : "Background Play Disabled"}
-        </Text>
+        <View style={styles.categoryTabs}>
+          {Object.values(SOUND_CATEGORIES).map((category) => (
+            <TouchableOpacity
+              key={category}
+              style={[
+                styles.categoryTab,
+                {
+                  backgroundColor:
+                    selectedCategory === category
+                      ? theme.primary
+                      : theme.surface,
+                  borderColor: theme.border,
+                },
+              ]}
+              onPress={() => setSelectedCategory(category)}
+            >
+              <Text
+                style={[
+                  styles.categoryTabText,
+                  {
+                    color: selectedCategory === category ? "white" : theme.text,
+                  },
+                ]}
+              >
+                {category}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
-
       <View style={styles.soundsList}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {WHITE_NOISE_SOUNDS.map((soundItem, index) => (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          ref={(ref) => {
+            scrollViewRef.current = ref;
+            setScrollViewRef("index", ref);
+          }}
+        >
+          {WHITE_NOISE_SOUNDS.filter(
+            (sound) =>
+              selectedCategory === SOUND_CATEGORIES.ALL ||
+              sound.category === selectedCategory
+          ).map((soundItem, index) => (
             <SoundCard key={soundItem.id} soundItem={soundItem} index={index} />
           ))}
           <View style={{ height: 100 }} />
         </ScrollView>
       </View>
-
       {activeSounds.size > 0 && (
         <>
           {/* Overlay */}
           <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-            {/* BlurView is web-compatible; if you ever hit issues, fallback to a View */}
-            <BlurView
-              intensity={60}
-              tint={themeMode === "dark" ? "dark" : "light"}
-              style={styles.blurView}
-            >
-              <TouchableOpacity
-                style={styles.overlayTouchable}
-                onPress={handleOverlayPress}
-                activeOpacity={1}
-              />
-            </BlurView>
+            <TouchableOpacity
+              style={styles.overlayTouchable}
+              onPress={handleOverlayPress}
+              activeOpacity={1}
+            />
           </Animated.View>
 
           <Animated.View
@@ -1448,7 +1484,6 @@ export default function SoundsScreen() {
           </Animated.View>
         </>
       )}
-
       {/* Mixer Modal */}
       <MixerModal
         visible={mixerModalVisible}
@@ -1460,7 +1495,6 @@ export default function SoundsScreen() {
         isPro={pro}
         onOpenPaywall={() => setPaywallOpen(true)}
       />
-
       {/* Timer Modal */}
       <TimerModal
         visible={timerModalVisible}
@@ -1469,7 +1503,6 @@ export default function SoundsScreen() {
         theme={theme}
         currentTimer={timerMinutes}
       />
-
       {/* Paywall */}
       <Paywall
         visible={paywallOpen}
@@ -1525,15 +1558,30 @@ function AnimatedControlButton({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: 20, alignItems: "center" },
-  title: { fontSize: 28, fontWeight: "bold", marginBottom: 4 },
-  subtitle: { fontSize: 16, marginBottom: 8 },
+  header: { padding: 10, alignItems: "center", opacity: 0.8 },
+  title: { fontSize: 28, fontWeight: "bold", marginBottom: 8 },
+  categoryTabs: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+  },
+  categoryTab: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  categoryTabText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
   backgroundPlayIndicator: {
     fontSize: 12,
     fontWeight: "600",
     textAlign: "center",
   },
-  soundsList: { flex: 1, padding: 20 },
+  soundsList: { flex: 1, padding: 10 },
   soundCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -1566,7 +1614,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1,
   },
-  blurView: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.3)" },
+
   overlayTouchable: { flex: 1 },
   playerControls: {
     position: "absolute",
@@ -1630,5 +1678,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginLeft: 6,
+  },
+  playingText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    marginTop: 4,
   },
 });

@@ -1,5 +1,7 @@
 // app/(tabs)/_layout.tsx
 import { WHITE_NOISE_SOUNDS } from "@/constants/sound";
+import { useQuickPlay } from "@/contexts/quickplay";
+import { useScroll } from "@/contexts/scroll";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { Tabs, useRouter } from "expo-router";
@@ -28,9 +30,14 @@ const Storage = {
 export default function TabLayout() {
   const { theme, themeMode } = useTheme();
   const router = useRouter();
-  const [favoriteSoundId, setFavoriteSoundId] = useState<string | null>(null);
+  const { scrollToTop } = useScroll();
+  const {
+    favoriteSoundId,
+    setFavoriteSoundId,
+    isQuickPlaying,
+    setIsQuickPlaying,
+  } = useQuickPlay();
   const [quickPlaySound, setQuickPlaySound] = useState<any>(null);
-  const [isQuickPlaying, setIsQuickPlaying] = useState(false);
 
   // Load favorite sound on mount
   useEffect(() => {
@@ -221,6 +228,11 @@ export default function TabLayout() {
               }}
             />
           ),
+        }}
+        listeners={{
+          tabPress: (e) => {
+            scrollToTop();
+          },
         }}
       />
 

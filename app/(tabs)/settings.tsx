@@ -1,10 +1,11 @@
 // app/(tabs)/settings.tsx
 import { WHITE_NOISE_SOUNDS } from "@/constants/sound";
 import { useBackgroundPlay } from "@/contexts/backgroundplay";
+import { useScroll } from "@/contexts/scroll";
 import { useTheme } from "@/contexts/themecontext";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -45,6 +46,8 @@ export default function SettingsScreen() {
   const { theme, themeMode, toggleTheme } = useTheme();
   const { backgroundPlayEnabled, setBackgroundPlayEnabled } =
     useBackgroundPlay();
+  const { setScrollViewRef } = useScroll();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [favoriteSoundId, setFavoriteSoundId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -224,7 +227,14 @@ export default function SettingsScreen() {
         </Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        ref={(ref) => {
+          scrollViewRef.current = ref;
+          setScrollViewRef("settings", ref);
+        }}
+      >
         <SectionHeader title="Audio Settings" />
         <SettingItem
           icon="volume-high"

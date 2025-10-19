@@ -5,6 +5,8 @@ import "react-native-reanimated";
 import { ThemeProvider } from "../contexts/themecontext";
 
 import { BackgroundPlayProvider } from "@/contexts/backgroundplay";
+import { QuickPlayProvider } from "@/contexts/quickplay";
+import { ScrollProvider } from "@/contexts/scroll";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
 export default function RootLayout() {
@@ -21,11 +23,15 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <BackgroundPlayProvider>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
+        <QuickPlayProvider>
+          <ScrollProvider>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style="auto" />
+          </ScrollProvider>
+        </QuickPlayProvider>
       </BackgroundPlayProvider>
     </ThemeProvider>
   );

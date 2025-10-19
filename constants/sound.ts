@@ -1,3 +1,13 @@
+export const SOUND_CATEGORIES = {
+  ALL: "All",
+  NATURE: "Nature",
+  URBAN: "Urban",
+  AMBIENT: "Ambient",
+} as const;
+
+export type SoundCategory =
+  (typeof SOUND_CATEGORIES)[keyof typeof SOUND_CATEGORIES];
+
 export const WHITE_NOISE_SOUNDS = [
   {
     id: 0,
@@ -7,6 +17,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#6366f1",
     source: require("../assets/sounds/60/white-noise-60.mp3"),
     premium: false, // Free sound
+    category: SOUND_CATEGORIES.AMBIENT,
   },
   {
     id: 1,
@@ -16,6 +27,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#ef4444",
     source: require("../assets/sounds/60/blender-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.URBAN,
   },
   {
     id: 2,
@@ -25,6 +37,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#f59e0b",
     source: require("../assets/sounds/60/boiling-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.AMBIENT,
   },
   {
     id: 3,
@@ -34,6 +47,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#eab308",
     source: require("../assets/sounds/60/dryer-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.URBAN,
   },
   {
     id: 4,
@@ -43,6 +57,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#8b5cf6",
     source: require("../assets/sounds/60/fan-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.AMBIENT,
   },
   {
     id: 5,
@@ -52,6 +67,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#3b82f6",
     source: require("../assets/sounds/60/fridge-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.URBAN,
   },
   {
     id: 6,
@@ -61,6 +77,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#f97316",
     source: require("../assets/sounds/60/heater-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.AMBIENT,
   },
   {
     id: 7,
@@ -70,6 +87,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#22c55e",
     source: require("../assets/sounds/60/hoover-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.URBAN,
   },
   {
     id: 8,
@@ -79,6 +97,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#6b7280",
     source: require("../assets/sounds/60/motor-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.URBAN,
   },
   {
     id: 9,
@@ -88,6 +107,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#06b6d4",
     source: require("../assets/sounds/60/ocean-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.NATURE,
   },
   {
     id: 10,
@@ -97,6 +117,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#3b82f6",
     source: require("../assets/sounds/60/rain-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.NATURE,
   },
   {
     id: 11,
@@ -106,6 +127,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#0ea5e9",
     source: require("../assets/sounds/60/shower-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.AMBIENT,
   },
   {
     id: 12,
@@ -115,6 +137,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#6b7280",
     source: require("../assets/sounds/60/storm-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.NATURE,
   },
   {
     id: 13,
@@ -124,6 +147,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#16a34a",
     source: require("../assets/sounds/60/stream-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.NATURE,
   },
   {
     id: 14,
@@ -133,6 +157,7 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#fbbf24",
     source: require("../assets/sounds/60/train-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.URBAN,
   },
   {
     id: 15,
@@ -142,5 +167,6 @@ export const WHITE_NOISE_SOUNDS = [
     color: "#0ea5e9",
     source: require("../assets/sounds/60/waves-60.mp3"),
     premium: true,
+    category: SOUND_CATEGORIES.NATURE,
   },
 ];
