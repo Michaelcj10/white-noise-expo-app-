@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "WhiteNoiseApp",
-    "slug": "WhiteNoiseApp",
+    "name": "Driftly",
+    "slug": "Driftly",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "whitenoiseapp",
+    "scheme": "driftly",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
 
@@ -15,11 +15,11 @@
         "UIBackgroundModes": ["audio"],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.admintaggd01.WhiteNoiseApp"
+      "bundleIdentifier": "com.driftly.whitenoiseapp"
     },
 
     "android": {
-      "package": "com.admintaggd01.whitenoiseapp",          // REQUIRED for Play billing builds
+      "package": "com.driftly.whitenoiseapp",          // REQUIRED for Play billing builds
       "versionCode": 1,                                     // REQUIRED for Play uploads; bump on every release
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",

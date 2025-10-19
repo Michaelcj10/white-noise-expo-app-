@@ -67,7 +67,7 @@ export const themes = {
     tabBar: "#ffffff",
 
     // Accent colors - electric mint theme
-    primary: "#00dc82",
+    primary: "#000",
     secondary: "#ec4899",
     accent: "#06b6d4",
 

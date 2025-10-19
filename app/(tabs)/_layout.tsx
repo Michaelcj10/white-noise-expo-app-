@@ -148,12 +148,12 @@ export default function TabLayout() {
           justifyContent: "center",
           alignItems: "center",
           shadowColor: "#000",
-          shadowOffset: { width: 0, height: 4 },
+          shadowOffset: { width: 0, height: 3 },
           shadowOpacity: 0.3,
           shadowRadius: 8,
           elevation: 8,
           borderWidth: 3,
-          borderColor: theme.background,
+          borderColor: "transparent",
         }}
       >
         <Ionicons

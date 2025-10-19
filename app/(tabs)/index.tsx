@@ -1347,7 +1347,12 @@ export default function SoundsScreen() {
         backgroundColor={theme.background}
       />
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>White Noise</Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Ionicons name="moon" size={24} color={theme.text} />
+          <Text style={[styles.title, { color: theme.text, marginLeft: 8 }]}>
+            Driftly
+          </Text>
+        </View>
         <View style={styles.categoryTabs}>
           {Object.values(SOUND_CATEGORIES).map((category) => (
             <TouchableOpacity
