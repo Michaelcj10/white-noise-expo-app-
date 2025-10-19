@@ -842,6 +842,8 @@ export default function SoundsScreen() {
   const { setScrollViewRef } = useScroll();
   const scrollViewRef = useRef<ScrollView>(null);
 
+  const [focusKey, setFocusKey] = useState(0);
+
   // Multiple sounds support
   const [activeSounds, setActiveSounds] = useState<
     Map<
@@ -1231,10 +1233,21 @@ export default function SoundsScreen() {
     const cardScale = useRef(new Animated.Value(0.9)).current;
     const iconRotation = useRef(new Animated.Value(0)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
+    const translateY = useRef(new Animated.Value(30)).current;
 
     const isActive = activeSounds.has(soundItem.id);
     const isQuickPlayActive =
       isQuickPlaying && favoriteSoundId === String(soundItem.id);
+
+    useEffect(() => {
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 300,
+        delay: index * 50,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }, [translateY, index]);
 
     const handlePress = () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1258,7 +1271,7 @@ export default function SoundsScreen() {
     const locked = soundItem.premium && !pro;
 
     return (
-      <Animated.View style={{}}>
+      <Animated.View style={{ transform: [{ translateY }] }}>
         <TouchableOpacity
           style={[
             styles.soundCard,
@@ -1350,7 +1363,7 @@ export default function SoundsScreen() {
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Ionicons name="moon" size={24} color={theme.text} />
           <Text style={[styles.title, { color: theme.text, marginLeft: 8 }]}>
-            Driftly
+            Slumbr
           </Text>
         </View>
         <View style={styles.categoryTabs}>

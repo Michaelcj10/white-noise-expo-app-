@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Driftly",
-    "slug": "Driftly",
+    "name": "Slumbr",
+    "slug": "Slumbr",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "driftly",
+    "scheme": "slumbr",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
 
@@ -15,18 +15,18 @@
         "UIBackgroundModes": ["audio"],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.driftly.whitenoiseapp"
+      "bundleIdentifier": "com.slumbr.whitenoiseapp"
     },
 
     "android": {
-      "package": "com.driftly.whitenoiseapp",          // REQUIRED for Play billing builds
+      "package": "com.slumbr.whitenoiseapp",          // REQUIRED for Play billing builds
       "versionCode": 1,                                     // REQUIRED for Play uploads; bump on every release
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.admintaggd01.whitenoiseapp"
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.slumbr.whitenoiseapp"
     },
 
     "web": {
