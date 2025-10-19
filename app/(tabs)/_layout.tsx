@@ -274,6 +274,11 @@ export default function TabLayout() {
             />
           ),
         }}
+        listeners={{
+          tabPress: (e) => {
+            scrollToTop();
+          },
+        }}
       />
     </Tabs>
   );
