@@ -48,6 +48,7 @@ export default function SettingsScreen() {
   const [favoriteSoundId, setFavoriteSoundId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [aboutModalVisible, setAboutModalVisible] = useState(false);
+  const [contactModalVisible, setContactModalVisible] = useState(false);
   const [pro, setPro] = useState(false);
 
   // Load saved favourite + pro entitlement
@@ -273,9 +274,9 @@ export default function SettingsScreen() {
         />
         <SettingItem
           icon="mail"
-          title="Contact Support"
+          title="Contact Us"
           description="Get help or send feedback"
-          onPress={() => Alert.alert("Contact", "support@whitenoise.app")}
+          onPress={() => setContactModalVisible(true)}
           showArrow={true}
           color={theme.success}
         />
@@ -377,6 +378,59 @@ export default function SettingsScreen() {
           <TouchableOpacity
             style={[styles.closeButton, { backgroundColor: theme.primary }]}
             onPress={() => setAboutModalVisible(false)}
+          >
+            <Text style={styles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Contact Modal */}
+      <Modal visible={contactModalVisible} animationType="fade">
+        <SafeAreaView
+          style={[styles.container, { backgroundColor: theme.background }]}
+        >
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: theme.text }]}>
+              Contact Us
+            </Text>
+          </View>
+          <ScrollView
+            style={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.aboutContent}>
+              <Ionicons
+                name="mail"
+                size={80}
+                color={theme.primary}
+                style={styles.aboutIcon}
+              />
+              <Text style={[styles.aboutTitle, { color: theme.text }]}>
+                Get in Touch
+              </Text>
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                We&apos;re here to help! Whether you have questions, feedback,
+                or need support, don&apos;t hesitate to reach out.
+              </Text>
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                Email: support@whitenoise.app
+              </Text>
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                Response Time: We typically respond within 24 hours.
+              </Text>
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                For faster support, please include your device type, app
+                version, and a detailed description of your issue or question.
+              </Text>
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                Thank you for using White Noise Expo. Your feedback helps us
+                improve the app for everyone!
+              </Text>
+            </View>
+          </ScrollView>
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: theme.primary }]}
+            onPress={() => setContactModalVisible(false)}
           >
             <Text style={styles.closeButtonText}>Close</Text>
           </TouchableOpacity>

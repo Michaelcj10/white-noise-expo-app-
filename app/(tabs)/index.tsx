@@ -542,6 +542,35 @@ export default function SoundsScreen() {
 
   const playerSlide = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const [isGesturing, setIsGesturing] = useState(false);
+
+  const playerPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        setIsGesturing(true);
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (gestureState.dy > 0) {
+          playerSlide.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        setIsGesturing(false);
+        if (gestureState.dy > 100) {
+          stopAllSounds();
+        } else {
+          Animated.spring(playerSlide, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     configureAudioSession();
@@ -1053,7 +1082,15 @@ export default function SoundsScreen() {
                 transform: [{ translateY: playerSlide }],
               },
             ]}
+            {...playerPanResponder.panHandlers}
           >
+            <View style={styles.pullHandle}>
+              <Ionicons
+                name="chevron-down"
+                size={24}
+                color={theme.textSecondary}
+              />
+            </View>
             <View style={styles.nowPlaying}>
               <Text
                 style={[styles.nowPlayingText, { color: theme.textSecondary }]}
@@ -1265,6 +1302,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     elevation: 8,
     zIndex: 2,
+  },
+  pullHandle: {
+    alignItems: "center",
+    paddingVertical: 8,
+    marginBottom: 8,
   },
   nowPlaying: { alignItems: "center", marginBottom: 16 },
   nowPlayingText: {
