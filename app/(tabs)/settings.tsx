@@ -20,10 +20,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Paywall } from ".";
-
-/* ---------- Storage (web-safe) ---------- */
-const ENTITLEMENT_KEY = "entitlement_pro";
 
 /** Web + native storage shim */
 const Storage = {
@@ -51,22 +47,14 @@ export default function SettingsScreen() {
 
   const [favoriteSoundId, setFavoriteSoundId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [paywallVisible, setPaywallVisible] = useState(false);
   const [aboutModalVisible, setAboutModalVisible] = useState(false);
   const [pro, setPro] = useState(false);
-
-  async function iapIsPro(): Promise<boolean> {
-    const v = await Storage.getItem(ENTITLEMENT_KEY);
-    return v === "true";
-  }
 
   // Load saved favourite + pro entitlement
   useEffect(() => {
     (async () => {
       const storedId = await Storage.getItem("favorite_sound_id");
       if (storedId) setFavoriteSoundId(storedId);
-      const entitled = await iapIsPro();
-      setPro(entitled);
     })();
   }, []);
 
@@ -163,7 +151,6 @@ export default function SettingsScreen() {
     // Check entitlement if premium
     if (sound.premium && !pro) {
       setModalVisible(false);
-      setPaywallVisible(true);
       return;
     }
 
@@ -395,14 +382,6 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </SafeAreaView>
       </Modal>
-
-      {/* Paywall Modal */}
-      <Paywall
-        visible={paywallVisible}
-        onClose={() => setPaywallVisible(false)}
-        onUnlock={() => setPro(true)}
-        theme={theme}
-      />
     </SafeAreaView>
   );
 }

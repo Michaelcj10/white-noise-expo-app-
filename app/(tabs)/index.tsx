@@ -1,7 +1,7 @@
 import {
-    SOUND_CATEGORIES,
-    SoundCategory,
-    WHITE_NOISE_SOUNDS,
+  SOUND_CATEGORIES,
+  SoundCategory,
+  WHITE_NOISE_SOUNDS,
 } from "@/constants/sound";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
@@ -13,21 +13,20 @@ import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    AppState,
-    Easing,
-    Modal,
-    PanResponder,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Animated,
+  AppState,
+  Easing,
+  Modal,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useBackgroundPlay } from "../../contexts/backgroundplay";
@@ -59,71 +58,7 @@ const Storage = {
   },
 };
 
-/* ---------- IAP (Android only; web-safe shims) ---------- */
-import * as InAppPurchases from "expo-in-app-purchases";
-
-const PRODUCT_ID = "pro_unlock";
-
-async function iapInit(onEntitlement?: (owned: boolean) => void) {
-  if (!isAndroid) {
-    // Web/iOS: just read stored entitlement
-    const owned = (await Storage.getItem(ENTITLEMENT_KEY)) === "true";
-    onEntitlement?.(owned);
-    return;
-  }
-  
-  await InAppPurchases.connectAsync();
-  const owned = await iapRestore();
-  onEntitlement?.(owned);
-}
-
-async function iapEnd() {
-  if (!isAndroid) return;
-  await InAppPurchases.disconnectAsync();
-}
-
-async function iapLoadProduct(): Promise<any | null> {
-  if (!isAndroid) return null;
-  
-  const { responseCode, results } = await InAppPurchases.getProductsAsync([PRODUCT_ID]);
-  
-  if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-    return results?.[0] ?? null;
-  }
-  
-  return null;
-}
-
-async function iapBuy() {
-  if (!isAndroid)
-    throw new Error("Purchases only supported on Android.");
-  await InAppPurchases.purchaseItemAsync(PRODUCT_ID);
-}
-
-async function iapRestore(): Promise<boolean> {
-  if (!isAndroid) {
-    const owned = (await Storage.getItem(ENTITLEMENT_KEY)) === "true";
-    return owned;
-  }
-  
-  const { responseCode, results } = await InAppPurchases.getPurchaseHistoryAsync();
-  
-  if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-    const owned = results?.some((p: any) => p.productId === PRODUCT_ID) ?? false;
-    await Storage.setItem(ENTITLEMENT_KEY, owned ? "true" : "false");
-    return owned;
-  }
-  
-  await Storage.setItem(ENTITLEMENT_KEY, "false");
-  return false;
-}
-
-async function iapIsPro(): Promise<boolean> {
-  const v = await Storage.getItem(ENTITLEMENT_KEY);
-  return v === "true";
-}
-
-/* ---------- Mixer Modal (Pro Feature) ---------- */
+/* ---------- Mixer Modal ---------- */
 function MixerModal({
   visible,
   onClose,
@@ -131,8 +66,6 @@ function MixerModal({
   activeSounds,
   onToggleSound,
   onVolumeChange,
-  isPro,
-  onOpenPaywall,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -143,8 +76,6 @@ function MixerModal({
   >;
   onToggleSound: (soundItem: any) => void;
   onVolumeChange: (soundId: number, volume: number) => void;
-  isPro: boolean;
-  onOpenPaywall: () => void;
 }) {
   const [localVolumes, setLocalVolumes] = useState<Map<number, number>>(
     new Map()
@@ -313,22 +244,6 @@ function MixerModal({
             >
               Sound Mixer
             </Text>
-            {!isPro && (
-              <View
-                style={{
-                  backgroundColor: theme.primary,
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 8,
-                }}
-              >
-                <Text
-                  style={{ color: "white", fontSize: 12, fontWeight: "600" }}
-                >
-                  PRO
-                </Text>
-              </View>
-            )}
           </View>
           <Text
             style={{
@@ -337,120 +252,92 @@ function MixerModal({
               marginBottom: 20,
             }}
           >
-            {isPro
-              ? "Mix multiple sounds together"
-              : "Upgrade to Pro to mix sounds"}
+            Mix multiple sounds together
           </Text>
 
-          {!isPro && (
-            <TouchableOpacity
-              onPress={() => {
-                onClose();
-                onOpenPaywall();
-              }}
-              style={{
-                backgroundColor: theme.primary,
-                padding: 14,
-                borderRadius: 12,
-                alignItems: "center",
-                marginBottom: 20,
-              }}
-            >
-              <Text style={{ color: "white", fontWeight: "700" }}>
-                Unlock Sound Mixing
-              </Text>
-            </TouchableOpacity>
-          )}
-
           <ScrollView showsVerticalScrollIndicator={false}>
-            {WHITE_NOISE_SOUNDS.filter((s) => !s.premium || isPro).map(
-              (soundItem) => {
-                const isActive = activeSounds.has(soundItem.id);
-                const soundData = activeSounds.get(soundItem.id);
-                const volume = localVolumes.get(soundItem.id) || 0.5;
+            {WHITE_NOISE_SOUNDS.map((soundItem) => {
+              const isActive = activeSounds.has(soundItem.id);
+              const soundData = activeSounds.get(soundItem.id);
+              const volume = localVolumes.get(soundItem.id) || 0.5;
 
-                return (
+              return (
+                <View
+                  key={soundItem.id}
+                  style={{
+                    marginBottom: 16,
+                    padding: 16,
+                    borderRadius: 12,
+                    backgroundColor: isActive ? theme.card : theme.background,
+                    borderWidth: 1,
+                    borderColor: isActive ? theme.primary : theme.border,
+                  }}
+                >
                   <View
-                    key={soundItem.id}
                     style={{
-                      marginBottom: 16,
-                      padding: 16,
-                      borderRadius: 12,
-                      backgroundColor: isActive ? theme.card : theme.background,
-                      borderWidth: 1,
-                      borderColor: isActive ? theme.primary : theme.border,
-                      opacity: isPro ? 1 : 0.6,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginBottom: isActive ? 12 : 0,
                     }}
                   >
                     <View
                       style={{
-                        flexDirection: "row",
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: soundItem.color,
+                        justifyContent: "center",
                         alignItems: "center",
-                        marginBottom: isActive ? 12 : 0,
+                        marginRight: 12,
                       }}
                     >
-                      <View
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 20,
-                          backgroundColor: soundItem.color,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          marginRight: 12,
-                        }}
-                      >
-                        <Ionicons
-                          name={
-                            soundItem.icon as React.ComponentProps<
-                              typeof Ionicons
-                            >["name"]
-                          }
-                          size={20}
-                          color="white"
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={{
-                            color: theme.text,
-                            fontSize: 16,
-                            fontWeight: "600",
-                          }}
-                        >
-                          {soundItem.name}
-                        </Text>
-                        <Text
-                          style={{ color: theme.textSecondary, fontSize: 12 }}
-                        >
-                          {soundItem.description}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={isActive}
-                        onValueChange={(value: boolean) => {
-                          if (isPro) onToggleSound(soundItem);
-                        }}
-                        disabled={!isPro}
-                        trackColor={{
-                          false: theme.border,
-                          true: theme.primary,
-                        }}
-                        thumbColor={isActive ? "white" : theme.textSecondary}
+                      <Ionicons
+                        name={
+                          soundItem.icon as React.ComponentProps<
+                            typeof Ionicons
+                          >["name"]
+                        }
+                        size={20}
+                        color="white"
                       />
                     </View>
-
-                    {isActive && isPro && (
-                      <VolumeSlider
-                        soundId={soundItem.id}
-                        soundItem={soundItem}
-                        volume={volume}
-                      />
-                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          color: theme.text,
+                          fontSize: 16,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {soundItem.name}
+                      </Text>
+                      <Text
+                        style={{ color: theme.textSecondary, fontSize: 12 }}
+                      >
+                        {soundItem.description}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={isActive}
+                      onValueChange={() => onToggleSound(soundItem)}
+                      trackColor={{
+                        false: theme.border,
+                        true: theme.primary,
+                      }}
+                      thumbColor={isActive ? "white" : theme.textSecondary}
+                    />
                   </View>
-                );
-              }
-            )}
+
+                  {isActive && (
+                    <VolumeSlider
+                      soundId={soundItem.id}
+                      soundItem={soundItem}
+                      volume={volume}
+                    />
+                  )}
+                </View>
+              );
+            })}
           </ScrollView>
 
           <TouchableOpacity
@@ -612,243 +499,6 @@ function TimerModal({
   );
 }
 
-/* ---------- Paywall Modal (web-safe) ---------- */
-export function Paywall({
-  visible,
-  onClose,
-  onUnlock,
-  theme,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onUnlock: () => void;
-  theme: any;
-}) {
-  const [loading, setLoading] = useState(true);
-  const [price, setPrice] = useState<string>("");
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function boot() {
-      await iapInit((owned) => {
-        if (owned) {
-          onUnlock();
-          onClose();
-        }
-      });
-
-      if (isAndroid) {
-        // Set up purchase listener for Android
-        InAppPurchases.setPurchaseListener(({ responseCode, results, errorCode }) => {
-          if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-            results?.forEach(async (purchase: any) => {
-              if (!purchase.acknowledged && purchase.productId === PRODUCT_ID) {
-                try {
-                  await InAppPurchases.finishTransactionAsync(purchase, true);
-                  await Storage.setItem(ENTITLEMENT_KEY, "true");
-                  onUnlock();
-                  onClose();
-                } catch (e) {
-                  console.warn("finishTransaction error", e);
-                }
-              }
-            });
-          } else if (responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED) {
-            console.log("User canceled the purchase");
-          } else if (errorCode) {
-            console.warn("Purchase error:", errorCode);
-          }
-        });
-
-        const p = await iapLoadProduct();
-        if (mounted) {
-          setPrice(p?.price ?? "");
-          setLoading(false);
-        }
-      } else {
-        // Web/iOS - no IAP
-        setLoading(false);
-      }
-    }
-
-    if (visible) boot();
-
-    return () => {
-      mounted = false;
-      iapEnd();
-    };
-  }, [visible, onClose, onUnlock]);
-
-  const onBuy = async () => {
-    try {
-      if (!isAndroid) {
-        Alert.alert(
-          "Not available",
-          "Purchases are only available on Android."
-        );
-        return;
-      }
-      await iapBuy();
-    } catch (e) {
-      Alert.alert("Purchase failed", "Please try again.");
-    }
-  };
-
-  const onRestorePress = async () => {
-    setLoading(true);
-    const ok = await iapRestore();
-    setLoading(false);
-    if (ok) {
-      onUnlock();
-      onClose();
-    } else {
-      Alert.alert("Nothing to restore", "No previous purchase found.");
-    }
-  };
-
-  const isStoreDisabled = !isAndroid;
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "#0006",
-          justifyContent: "flex-end",
-        }}
-      >
-        <View
-          style={{
-            backgroundColor: theme.surface,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            padding: 24,
-            borderTopWidth: 1,
-            borderColor: theme.border,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 22,
-              fontWeight: "700",
-              color: theme.text,
-              marginBottom: 6,
-            }}
-          >
-            Go Pro
-          </Text>
-          <Text
-            style={{
-              opacity: 0.7,
-              color: theme.textSecondary,
-              marginBottom: 16,
-            }}
-          >
-            Unlock premium features:
-          </Text>
-
-          <View style={{ marginBottom: 16 }}>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 8,
-              }}
-            >
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={theme.primary}
-              />
-              <Text style={{ color: theme.text, marginLeft: 8 }}>
-                All premium 60-minute sounds
-              </Text>
-            </View>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 8,
-              }}
-            >
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={theme.primary}
-              />
-              <Text style={{ color: theme.text, marginLeft: 8 }}>
-                Mix multiple sounds together
-              </Text>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={theme.primary}
-              />
-              <Text style={{ color: theme.text, marginLeft: 8 }}>
-                One-time purchase, lifetime access
-              </Text>
-            </View>
-          </View>
-
-          {isStoreDisabled && (
-            <Text style={{ color: theme.textSecondary, marginBottom: 12 }}>
-              Purchases are only supported on Android. You can still preview
-              free sounds.
-            </Text>
-          )}
-
-          {loading ? (
-            <ActivityIndicator />
-          ) : (
-            <>
-              <TouchableOpacity
-                disabled={isStoreDisabled}
-                onPress={onBuy}
-                style={{
-                  padding: 14,
-                  borderRadius: 12,
-                  backgroundColor: isStoreDisabled
-                    ? theme.border
-                    : theme.primary,
-                  alignItems: "center",
-                  marginBottom: 8,
-                  opacity: isStoreDisabled ? 0.8 : 1,
-                }}
-                activeOpacity={0.9}
-              >
-                <Text style={{ color: "white", fontWeight: "700" }}>
-                  {isStoreDisabled
-                    ? "Unlock (Android only)"
-                    : `Unlock Pro • ${price || "—"}`}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={onRestorePress}
-                style={{ padding: 12, alignItems: "center" }}
-              >
-                <Text style={{ fontWeight: "600", color: theme.text }}>
-                  Restore Purchases
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          <TouchableOpacity
-            onPress={onClose}
-            style={{ padding: 8, alignItems: "center", marginTop: 8 }}
-          >
-            <Text style={{ color: theme.textSecondary }}>Maybe later</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 /* ================== YOUR SCREEN (with gate) ================== */
 export default function SoundsScreen() {
   const { theme, themeMode } = useTheme();
@@ -896,13 +546,6 @@ export default function SoundsScreen() {
   useEffect(() => {
     configureAudioSession();
   }, [backgroundPlayEnabled]);
-
-  // Entitlement on mount
-  useEffect(() => {
-    iapIsPro()
-      .then(setPro)
-      .catch(() => setPro(false));
-  }, []);
 
   // Handle app state changes (safe on web)
   useEffect(() => {
@@ -955,7 +598,7 @@ export default function SoundsScreen() {
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [timerMinutes, isPlaying, timerSeconds]);
+  }, [timerMinutes, isPlaying]);
 
   const configureAudioSession = async () => {
     try {
@@ -1114,7 +757,7 @@ export default function SoundsScreen() {
 
   // Play single sound (from main list)
   const tryPlaySingle = async (soundItem: any) => {
-    const entitled = await iapIsPro();
+    const entitled = true;
     setPro(entitled);
 
     if (soundItem.premium && !entitled) {
@@ -1245,40 +888,12 @@ export default function SoundsScreen() {
   };
 
   function SoundCard({ soundItem, index }: { soundItem: any; index: number }) {
-    const cardScale = useRef(new Animated.Value(0.9)).current;
-    const iconRotation = useRef(new Animated.Value(0)).current;
-    const pulseAnim = useRef(new Animated.Value(1)).current;
-    const translateY = useRef(new Animated.Value(30)).current;
-
     const isActive = activeSounds.has(soundItem.id);
     const isQuickPlayActive =
       isQuickPlaying && favoriteSoundId === String(soundItem.id);
 
-    useEffect(() => {
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 300,
-        delay: index * 50,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }).start();
-    }, [translateY, index]);
-
     const handlePress = () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      Animated.sequence([
-        Animated.timing(cardScale, {
-          toValue: 0.95,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(cardScale, {
-          toValue: 1,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
       // Gate playback
       tryPlaySingle(soundItem);
     };
@@ -1286,7 +901,7 @@ export default function SoundsScreen() {
     const locked = soundItem.premium && !pro;
 
     return (
-      <Animated.View style={{ transform: [{ translateY }] }}>
+      <View>
         <TouchableOpacity
           style={[
             styles.soundCard,
@@ -1300,28 +915,11 @@ export default function SoundsScreen() {
           onPress={handlePress}
           activeOpacity={0.8}
         >
-          <Animated.View
-            style={[
-              styles.iconContainer,
-              { backgroundColor: soundItem.color },
-              { transform: [{ scale: pulseAnim }] },
-            ]}
+          <View
+            style={[styles.iconContainer, { backgroundColor: soundItem.color }]}
           >
-            <Animated.View
-              style={{
-                transform: [
-                  {
-                    rotate: iconRotation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["0deg", "360deg"],
-                    }),
-                  },
-                ],
-              }}
-            >
-              <Ionicons name={soundItem.icon} size={24} color="white" />
-            </Animated.View>
-          </Animated.View>
+            <Ionicons name={soundItem.icon} size={24} color="white" />
+          </View>
 
           <View style={styles.soundInfo}>
             <Text style={[styles.soundName, { color: theme.text }]}>
@@ -1348,21 +946,16 @@ export default function SoundsScreen() {
               />
             </View>
           ) : isActive || isQuickPlayActive ? (
-            <Animated.View
-              style={[
-                styles.playingIndicator,
-                { transform: [{ scale: pulseAnim }] },
-              ]}
-            >
+            <View style={styles.playingIndicator}>
               <Ionicons
                 name={isPlaying ? "volume-high" : "volume-mute"}
                 size={20}
                 color={soundItem.color}
               />
-            </Animated.View>
+            </View>
           ) : null}
         </TouchableOpacity>
-      </Animated.View>
+      </View>
     );
   }
 
@@ -1455,7 +1048,7 @@ export default function SoundsScreen() {
             style={[
               styles.playerControls,
               {
-                backgroundColor: theme.surface,
+                backgroundColor: theme.tabBar,
                 borderTopColor: theme.border,
                 transform: [{ translateY: playerSlide }],
               },
@@ -1538,8 +1131,6 @@ export default function SoundsScreen() {
         activeSounds={activeSounds}
         onToggleSound={toggleSoundInMixer}
         onVolumeChange={changeSoundVolume}
-        isPro={pro}
-        onOpenPaywall={() => setPaywallOpen(true)}
       />
       {/* Timer Modal */}
       <TimerModal
@@ -1548,13 +1139,6 @@ export default function SoundsScreen() {
         onSetTimer={handleSetTimer}
         theme={theme}
         currentTimer={timerMinutes}
-      />
-      {/* Paywall */}
-      <Paywall
-        visible={paywallOpen}
-        onClose={() => setPaywallOpen(false)}
-        onUnlock={() => setPro(true)}
-        theme={theme}
       />
     </SafeAreaView>
   );
