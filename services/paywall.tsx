@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Modal,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Modal,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { buy, endIAP, initIAP, loadProduct, restore } from "./iapManager";
 
@@ -24,7 +24,7 @@ export default function Paywall({
     let mounted = true;
     if (visible) {
       (async () => {
-        await initIAP((owned: any) => {
+        await initIAP((owned: boolean) => {
           if (owned) {
             onUnlock();
             onClose();
@@ -32,7 +32,7 @@ export default function Paywall({
         });
         const p = await loadProduct();
         if (mounted) {
-          setPrice(p?.localizedPrice ?? "");
+          setPrice(p?.price ?? "");
           setLoading(false);
         }
       })();

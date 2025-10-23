@@ -1,7 +1,7 @@
 import {
-  SOUND_CATEGORIES,
-  SoundCategory,
-  WHITE_NOISE_SOUNDS,
+    SOUND_CATEGORIES,
+    SoundCategory,
+    WHITE_NOISE_SOUNDS,
 } from "@/constants/sound";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
@@ -13,21 +13,21 @@ import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  AppState,
-  Easing,
-  Modal,
-  PanResponder,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    AppState,
+    Easing,
+    Modal,
+    PanResponder,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useBackgroundPlay } from "../../contexts/backgroundplay";
@@ -60,49 +60,62 @@ const Storage = {
 };
 
 /* ---------- IAP (Android only; web-safe shims) ---------- */
+import * as InAppPurchases from "expo-in-app-purchases";
+
 const PRODUCT_ID = "pro_unlock";
 
-// Lazy-require IAP only on Android to avoid web bundling issues
-const IAP: any = isAndroid ? require("react-native-iap") : null;
-
 async function iapInit(onEntitlement?: (owned: boolean) => void) {
-  if (!isAndroid || !IAP) {
+  if (!isAndroid) {
     // Web/iOS: just read stored entitlement
     const owned = (await Storage.getItem(ENTITLEMENT_KEY)) === "true";
     onEntitlement?.(owned);
     return;
   }
-  await IAP.initConnection();
+  
+  await InAppPurchases.connectAsync();
   const owned = await iapRestore();
   onEntitlement?.(owned);
 }
 
 async function iapEnd() {
-  if (!isAndroid || !IAP) return;
-  await IAP.endConnection();
+  if (!isAndroid) return;
+  await InAppPurchases.disconnectAsync();
 }
 
 async function iapLoadProduct(): Promise<any | null> {
-  if (!isAndroid || !IAP) return null;
-  const prods = await IAP.getProducts({ skus: [PRODUCT_ID] });
-  return prods?.[0] ?? null;
+  if (!isAndroid) return null;
+  
+  const { responseCode, results } = await InAppPurchases.getProductsAsync([PRODUCT_ID]);
+  
+  if (responseCode === InAppPurchases.IAPResponseCode.OK) {
+    return results?.[0] ?? null;
+  }
+  
+  return null;
 }
 
 async function iapBuy() {
-  if (!isAndroid || !IAP)
+  if (!isAndroid)
     throw new Error("Purchases only supported on Android.");
-  await IAP.requestPurchase({ skus: [PRODUCT_ID] });
+  await InAppPurchases.purchaseItemAsync(PRODUCT_ID);
 }
 
 async function iapRestore(): Promise<boolean> {
-  if (!isAndroid || !IAP) {
+  if (!isAndroid) {
     const owned = (await Storage.getItem(ENTITLEMENT_KEY)) === "true";
     return owned;
   }
-  const purchases = await IAP.getAvailablePurchases();
-  const owned = purchases.some((p: any) => p.productId === PRODUCT_ID);
-  await Storage.setItem(ENTITLEMENT_KEY, owned ? "true" : "false");
-  return owned;
+  
+  const { responseCode, results } = await InAppPurchases.getPurchaseHistoryAsync();
+  
+  if (responseCode === InAppPurchases.IAPResponseCode.OK) {
+    const owned = results?.some((p: any) => p.productId === PRODUCT_ID) ?? false;
+    await Storage.setItem(ENTITLEMENT_KEY, owned ? "true" : "false");
+    return owned;
+  }
+  
+  await Storage.setItem(ENTITLEMENT_KEY, "false");
+  return false;
 }
 
 async function iapIsPro(): Promise<boolean> {
@@ -616,8 +629,6 @@ export function Paywall({
 
   useEffect(() => {
     let mounted = true;
-    let subUpdate: any;
-    let subError: any;
 
     async function boot() {
       await iapInit((owned) => {
@@ -627,28 +638,32 @@ export function Paywall({
         }
       });
 
-      if (isAndroid && IAP) {
-        // Listeners only on Android
-        subUpdate = IAP.purchaseUpdatedListener(async (purchase: any) => {
-          try {
-            if (purchase.productId === PRODUCT_ID) {
-              await IAP.finishTransaction({ purchase, isConsumable: false });
-              await Storage.setItem(ENTITLEMENT_KEY, "true");
-              onUnlock();
-              onClose();
-            }
-          } catch (e) {
-            console.warn("finishTransaction error", e);
+      if (isAndroid) {
+        // Set up purchase listener for Android
+        InAppPurchases.setPurchaseListener(({ responseCode, results, errorCode }) => {
+          if (responseCode === InAppPurchases.IAPResponseCode.OK) {
+            results?.forEach(async (purchase: any) => {
+              if (!purchase.acknowledged && purchase.productId === PRODUCT_ID) {
+                try {
+                  await InAppPurchases.finishTransactionAsync(purchase, true);
+                  await Storage.setItem(ENTITLEMENT_KEY, "true");
+                  onUnlock();
+                  onClose();
+                } catch (e) {
+                  console.warn("finishTransaction error", e);
+                }
+              }
+            });
+          } else if (responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED) {
+            console.log("User canceled the purchase");
+          } else if (errorCode) {
+            console.warn("Purchase error:", errorCode);
           }
-        });
-
-        subError = IAP.purchaseErrorListener((err: any) => {
-          console.warn("purchaseErrorListener", err);
         });
 
         const p = await iapLoadProduct();
         if (mounted) {
-          setPrice(p?.localizedPrice ?? "");
+          setPrice(p?.price ?? "");
           setLoading(false);
         }
       } else {
@@ -661,10 +676,6 @@ export function Paywall({
 
     return () => {
       mounted = false;
-      try {
-        subUpdate?.remove?.();
-        subError?.remove?.();
-      } catch {}
       iapEnd();
     };
   }, [visible, onClose, onUnlock]);

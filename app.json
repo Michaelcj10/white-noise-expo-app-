@@ -19,8 +19,11 @@
     },
 
     "android": {
-      "package": "com.slumbr.whitenoiseapp",          // REQUIRED for Play billing builds
-      "versionCode": 1,                                     // REQUIRED for Play uploads; bump on every release
+      "package": "com.slumbr.whitenoiseapp",
+      "versionCode": 1,
+      "permissions": [
+        "com.android.vending.BILLING"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -46,7 +49,6 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "react-native-iap",         // adds BILLING permission & manifest bits
       "expo-secure-store"
     ],
 
