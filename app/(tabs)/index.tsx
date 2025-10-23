@@ -1380,38 +1380,36 @@ export default function SoundsScreen() {
             transition={1000}
           />
         </View>
-        <View style={styles.categoryTabs}>
-          {Object.values(SOUND_CATEGORIES).map((category) => (
-            <TouchableOpacity
-              key={category}
+      </View>
+      <View style={styles.categoryTabs}>
+        {Object.values(SOUND_CATEGORIES).map((category) => (
+          <TouchableOpacity
+            key={category}
+            style={[
+              styles.categoryTab,
+              {
+                backgroundColor:
+                  selectedCategory === category ? theme.primary : theme.surface,
+                borderColor: theme.border,
+              },
+            ]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSelectedCategory(category);
+            }}
+          >
+            <Text
               style={[
-                styles.categoryTab,
+                styles.categoryTabText,
                 {
-                  backgroundColor:
-                    selectedCategory === category
-                      ? theme.primary
-                      : theme.surface,
-                  borderColor: theme.border,
+                  color: selectedCategory === category ? "white" : theme.text,
                 },
               ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setSelectedCategory(category);
-              }}
             >
-              <Text
-                style={[
-                  styles.categoryTabText,
-                  {
-                    color: selectedCategory === category ? "white" : theme.text,
-                  },
-                ]}
-              >
-                {category}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              {category}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
       <View style={styles.soundsList}>
         <ScrollView
@@ -1595,14 +1593,18 @@ function AnimatedControlButton({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: 10, alignItems: "center" },
+  header: {
+    padding: 10,
+    alignItems: "center",
+    height: 65,
+  },
   title: { fontSize: 28, fontWeight: "bold", marginBottom: 8 },
   categoryTabs: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
     gap: 8,
-    paddingTop: 15,
+    paddingBottom: 10,
   },
   image: {
     width: 300,
