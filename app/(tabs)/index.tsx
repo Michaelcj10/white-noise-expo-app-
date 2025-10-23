@@ -1595,13 +1595,14 @@ function AnimatedControlButton({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: 10, alignItems: "center", opacity: 0.8 },
+  header: { padding: 10, alignItems: "center" },
   title: { fontSize: 28, fontWeight: "bold", marginBottom: 8 },
   categoryTabs: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
     gap: 8,
+    paddingTop: 15,
   },
   image: {
     width: 300,

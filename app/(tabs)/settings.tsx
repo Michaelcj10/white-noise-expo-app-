@@ -52,6 +52,7 @@ export default function SettingsScreen() {
   const [favoriteSoundId, setFavoriteSoundId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [aboutModalVisible, setAboutModalVisible] = useState(false);
   const [pro, setPro] = useState(false);
 
   async function iapIsPro(): Promise<boolean> {
@@ -145,11 +146,7 @@ export default function SettingsScreen() {
   };
 
   const handleAboutPress = () => {
-    Alert.alert(
-      "About White Noise",
-      "Version 1.0.0\n\nA simple and elegant white noise app to help you focus, relax, and sleep better.",
-      [{ text: "OK" }]
-    );
+    setAboutModalVisible(true);
   };
 
   const handleRatePress = () => {
@@ -339,6 +336,66 @@ export default function SettingsScreen() {
         </SafeAreaView>
       </Modal>
 
+      {/* About Modal */}
+      <Modal visible={aboutModalVisible} animationType="fade">
+        <SafeAreaView
+          style={[styles.container, { backgroundColor: theme.background }]}
+        >
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: theme.text }]}>About</Text>
+          </View>
+          <ScrollView
+            style={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.aboutContent}>
+              <Ionicons
+                name="musical-notes"
+                size={80}
+                color={theme.primary}
+                style={styles.aboutIcon}
+              />
+              <Text style={[styles.aboutTitle, { color: theme.text }]}>
+                White Noise Expo
+              </Text>
+              <Text
+                style={[styles.aboutVersion, { color: theme.textSecondary }]}
+              >
+                Version 1.0.0
+              </Text>
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                Welcome to White Noise Expo, your ultimate companion for
+                relaxation, focus, and better sleep. Our app offers a curated
+                collection of high-quality white noise sounds designed to help
+                you create the perfect ambiance for any moment.
+              </Text>
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                Whether you&apos;re working, studying, meditating, or winding
+                down for the night, our diverse range of sounds - from gentle
+                rain to ocean waves, forest ambiances to urban rhythms -
+                provides the ideal backdrop for your needs.
+              </Text>
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                Key Features: • Extensive library of premium white noise sounds
+                • Customizable playback options • Background play support • Dark
+                mode for comfortable viewing • Favorite sound selection •
+                Ad-free experience with Pro upgrade
+              </Text>
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                We&apos;re committed to helping you find your perfect
+                soundscape. Thank you for choosing White Noise Expo!
+              </Text>
+            </View>
+          </ScrollView>
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: theme.primary }]}
+            onPress={() => setAboutModalVisible(false)}
+          >
+            <Text style={styles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </Modal>
+
       {/* Paywall Modal */}
       <Paywall
         visible={paywallVisible}
@@ -410,4 +467,22 @@ const styles = StyleSheet.create({
   },
   soundTitle: { fontSize: 16, fontWeight: "600" },
   soundDesc: { fontSize: 14 },
+
+  aboutContent: { alignItems: "center", paddingVertical: 20 },
+  aboutIcon: { marginBottom: 20 },
+  aboutTitle: { fontSize: 24, fontWeight: "bold", marginBottom: 8 },
+  aboutVersion: { fontSize: 16, marginBottom: 20 },
+  aboutDescription: {
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  closeButton: {
+    margin: 20,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  closeButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
 });
