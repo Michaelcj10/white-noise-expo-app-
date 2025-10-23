@@ -1,0 +1,25 @@
+<svg width="403" height="200" viewBox="27 0 403 200" xmlns="http://www.w3.org/2000/svg">
+    <g>
+        <!-- Moon with outlined craters -->
+        <g transform="translate(70, 100)">
+            <!-- Main moon circle outline -->
+            <circle cx="0" cy="0" r="40" fill="none" stroke="black" stroke-width="4"/>
+            
+            <!-- Crater outlines -->
+            <circle cx="-12" cy="-8" r="5" fill="none" stroke="black" stroke-width="2" opacity="0.7"/>
+            <circle cx="10" cy="-15" r="3" fill="none" stroke="black" stroke-width="2" opacity="0.6"/>
+            <circle cx="5" cy="10" r="7" fill="none" stroke="black" stroke-width="2" opacity="0.8"/>
+            <circle cx="-8" cy="12" r="4" fill="none" stroke="black" stroke-width="2" opacity="0.5"/>
+            <circle cx="15" cy="5" r="2.5" fill="none" stroke="black" stroke-width="1.5" opacity="0.5"/>
+            <circle cx="-18" cy="3" r="3.5" fill="none" stroke="black" stroke-width="2" opacity="0.6"/>
+            
+            <!-- Small crater outlines -->
+            <circle cx="-5" cy="-18" r="1.5" fill="none" stroke="black" stroke-width="1.5" opacity="0.4"/>
+            <circle cx="12" cy="15" r="2" fill="none" stroke="black" stroke-width="1.5" opacity="0.4"/>
+            <circle cx="-15" cy="-12" r="1.8" fill="none" stroke="black" stroke-width="1.5" opacity="0.3"/>
+        </g>
+        
+        <!-- Text in black -->
+        <text x="140" y="120" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="black">slumbr</text>
+    </g>
+</svg>

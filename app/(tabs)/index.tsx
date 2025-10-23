@@ -9,6 +9,7 @@ import * as Haptics from "expo-haptics";
 
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useScroll } from "@/contexts/scroll";
+import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -31,6 +32,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useBackgroundPlay } from "../../contexts/backgroundplay";
 import { useTheme } from "../../contexts/themecontext";
+
+const darkLogo = require("../../assets/images/slumbr_logo_dark.svg");
+const whiteLogo = require("../../assets/images/slumbr_logo_light.svg");
 
 /* ---------- Platform helpers ---------- */
 const isWeb = Platform.OS === "web";
@@ -1360,11 +1364,21 @@ export default function SoundsScreen() {
         backgroundColor={theme.background}
       />
       <View style={styles.header}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Ionicons name="moon" size={24} color={theme.text} />
-          <Text style={[styles.title, { color: theme.text, marginLeft: 8 }]}>
-            Slumbr
-          </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            flex: 1,
+            width: "100%",
+          }}
+        >
+          <Image
+            style={styles.image}
+            source={themeMode === "dark" ? darkLogo : whiteLogo}
+            contentFit="contain"
+            transition={1000}
+          />
         </View>
         <View style={styles.categoryTabs}>
           {Object.values(SOUND_CATEGORIES).map((category) => (
@@ -1588,6 +1602,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "center",
     gap: 8,
+  },
+  image: {
+    width: 300,
+    height: 75,
   },
   categoryTab: {
     paddingHorizontal: 12,

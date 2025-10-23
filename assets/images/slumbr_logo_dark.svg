@@ -1,0 +1,25 @@
+<svg width="400" height="200" viewBox="30 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <g fill="white">
+        <!-- Moon with craters -->
+        <g transform="translate(70, 100)">
+            <!-- Main moon circle -->
+            <circle cx="0" cy="0" r="40" fill="white"/>
+            
+            <!-- Crater details (as cutouts) -->
+            <circle cx="-12" cy="-8" r="5" fill="rgba(0,0,0,0.15)"/>
+            <circle cx="10" cy="-15" r="3" fill="rgba(0,0,0,0.12)"/>
+            <circle cx="5" cy="10" r="7" fill="rgba(0,0,0,0.18)"/>
+            <circle cx="-8" cy="12" r="4" fill="rgba(0,0,0,0.1)"/>
+            <circle cx="15" cy="5" r="2.5" fill="rgba(0,0,0,0.1)"/>
+            <circle cx="-18" cy="3" r="3.5" fill="rgba(0,0,0,0.12)"/>
+            
+            <!-- Small crater details -->
+            <circle cx="-5" cy="-18" r="1.5" fill="rgba(0,0,0,0.08)"/>
+            <circle cx="12" cy="15" r="2" fill="rgba(0,0,0,0.08)"/>
+            <circle cx="-15" cy="-12" r="1.8" fill="rgba(0,0,0,0.06)"/>
+        </g>
+        
+        <!-- Text -->
+        <text x="140" y="120" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="white">slumbr</text>
+    </g>
+</svg>
