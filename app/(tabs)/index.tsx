@@ -9,9 +9,10 @@ import * as Haptics from "expo-haptics";
 
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useScroll } from "@/contexts/scroll";
+import { useFocusEffect } from "@react-navigation/native";
 import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -970,6 +971,26 @@ export default function SoundsScreen() {
     };
     loadFavorites();
   }, []);
+
+  // Reload favorites when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const loadFavorites = async () => {
+        try {
+          const stored = await Storage.getItem(FAVORITES_KEY);
+          if (stored) {
+            const ids = JSON.parse(stored);
+            setFavorites(new Set(ids));
+          } else {
+            setFavorites(new Set());
+          }
+        } catch (error) {
+          console.error("Error loading favorites:", error);
+        }
+      };
+      loadFavorites();
+    }, [])
+  );
 
   // Save favorites to storage whenever they change
   const saveFavorites = async (newFavorites: Set<number>) => {

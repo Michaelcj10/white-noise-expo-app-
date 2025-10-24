@@ -54,6 +54,22 @@ export default function SettingsScreen() {
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [pro, setPro] = useState(false);
   const [favoritesCount, setFavoritesCount] = useState(0);
+  const [confirmClearQuickPlayVisible, setConfirmClearQuickPlayVisible] =
+    useState(false);
+  const [successMessageVisible, setSuccessMessageVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [selectedSoundForConfirm, setSelectedSoundForConfirm] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [confirmClearFavoritesVisible, setConfirmClearFavoritesVisible] =
+    useState(false);
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [infoModalContent, setInfoModalContent] = useState({
+    title: "",
+    message: "",
+    icon: "information-circle" as keyof typeof Ionicons.glyphMap,
+  });
 
   // Load saved favourite + pro entitlement + favorites count
   useEffect(() => {
@@ -145,17 +161,21 @@ export default function SettingsScreen() {
   const handleBackgroundPlayToggle = (enabled: boolean) => {
     setBackgroundPlayEnabled(enabled);
     if (enabled) {
-      Alert.alert(
-        "Background Play Enabled",
-        "White noise sounds will now continue playing when you minimize the app or lock your device.",
-        [{ text: "Got it!" }]
-      );
+      setInfoModalContent({
+        title: "Background Play Enabled",
+        message:
+          "White noise sounds will now continue playing when you minimize the app or lock your device.",
+        icon: "checkmark-circle",
+      });
+      setInfoModalVisible(true);
     } else {
-      Alert.alert(
-        "Background Play Disabled",
-        "Audio will now stop when you minimize the app or lock your device.",
-        [{ text: "OK" }]
-      );
+      setInfoModalContent({
+        title: "Background Play Disabled",
+        message:
+          "Audio will now stop when you minimize the app or lock your device.",
+        icon: "information-circle",
+      });
+      setInfoModalVisible(true);
     }
   };
 
@@ -164,6 +184,7 @@ export default function SettingsScreen() {
   };
 
   const handleRatePress = () => {
+    // Could implement custom modal here too if desired
     Alert.alert("Rate App", "Would you like to rate our app?", [
       { text: "Later", style: "cancel" },
       { text: "Rate Now", onPress: () => console.log("Open store link") },
@@ -180,39 +201,62 @@ export default function SettingsScreen() {
       return;
     }
 
-    await Storage.setItem("favorite_sound_id", String(id));
-    setFavoriteSoundId(String(id));
-    setModalVisible(false);
-    Alert.alert(
-      "Quick Play Set",
-      `${sound.name} is now your quick play sound.`
+    setSelectedSoundForConfirm({ id, name: sound.name });
+  };
+
+  const confirmQuickPlaySelection = async () => {
+    if (!selectedSoundForConfirm) return;
+
+    await Storage.setItem(
+      "favorite_sound_id",
+      String(selectedSoundForConfirm.id)
     );
+    setFavoriteSoundId(String(selectedSoundForConfirm.id));
+    setSelectedSoundForConfirm(null);
+    setModalVisible(false);
+
+    // Show success message
+    setSuccessMessage(
+      `${selectedSoundForConfirm.name} is now your quick play sound.`
+    );
+    setSuccessMessageVisible(true);
+    setTimeout(() => setSuccessMessageVisible(false), 2500);
+  };
+
+  const confirmClearQuickPlay = async () => {
+    await Storage.setItem("favorite_sound_id", "");
+    setFavoriteSoundId(null);
+    setConfirmClearQuickPlayVisible(false);
+    setModalVisible(false);
+
+    // Show success message
+    setSuccessMessage("Quick play sound has been cleared.");
+    setSuccessMessageVisible(true);
+    setTimeout(() => setSuccessMessageVisible(false), 2500);
   };
 
   const handleClearFavorites = () => {
     if (favoritesCount === 0) {
-      Alert.alert("No Favorites", "You don't have any favorite sounds yet.");
+      setInfoModalContent({
+        title: "No Favorites",
+        message: "You don't have any favorite sounds yet.",
+        icon: "heart-outline",
+      });
+      setInfoModalVisible(true);
       return;
     }
 
-    Alert.alert(
-      "Clear All Favorites",
-      `Are you sure you want to clear all ${favoritesCount} favorite sound${
-        favoritesCount === 1 ? "" : "s"
-      }?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear",
-          style: "destructive",
-          onPress: async () => {
-            await Storage.setItem(FAVORITES_KEY, JSON.stringify([]));
-            setFavoritesCount(0);
-            Alert.alert("Cleared", "All favorites have been cleared.");
-          },
-        },
-      ]
-    );
+    setConfirmClearFavoritesVisible(true);
+  };
+
+  const confirmClearFavorites = async () => {
+    await Storage.setItem(FAVORITES_KEY, JSON.stringify([]));
+    setFavoritesCount(0);
+    setConfirmClearFavoritesVisible(false);
+
+    setSuccessMessage("All favorites have been cleared.");
+    setSuccessMessageVisible(true);
+    setTimeout(() => setSuccessMessageVisible(false), 2500);
   };
 
   const renderSoundItem = ({ item }: any) => {
@@ -357,10 +401,7 @@ export default function SettingsScreen() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: theme.textSecondary }]}>
-            White Noise v1.0.0
-          </Text>
-          <Text style={[styles.footerSubText, { color: theme.textMuted }]}>
-            Made with ❤️ for better sleep
+            Slumbr v1.0.0
           </Text>
         </View>
       </ScrollView>
@@ -388,26 +429,7 @@ export default function SettingsScreen() {
                 justifyContent: "center",
               }}
               onPress={() => {
-                Alert.alert(
-                  "Clear Quick Play",
-                  "Are you sure you want to clear your quick play sound?",
-                  [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Clear",
-                      style: "destructive",
-                      onPress: async () => {
-                        await Storage.setItem("favorite_sound_id", "");
-                        setFavoriteSoundId(null);
-                        setModalVisible(false);
-                        Alert.alert(
-                          "Cleared",
-                          "Quick play sound has been cleared."
-                        );
-                      },
-                    },
-                  ]
-                );
+                setConfirmClearQuickPlayVisible(true);
               }}
             >
               <Ionicons name="trash" size={20} color="white" />
@@ -548,6 +570,504 @@ export default function SettingsScreen() {
             <Text style={styles.closeButtonText}>Close</Text>
           </TouchableOpacity>
         </SafeAreaView>
+      </Modal>
+
+      {/* Confirm Quick Play Selection Modal */}
+      <Modal
+        visible={selectedSoundForConfirm !== null}
+        animationType="fade"
+        transparent
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              maxWidth: 400,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            <View
+              style={{
+                alignItems: "center",
+                marginBottom: 20,
+              }}
+            >
+              <View
+                style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 30,
+                  backgroundColor: theme.primary + "20",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: 16,
+                }}
+              >
+                <Ionicons name="flash" size={32} color={theme.primary} />
+              </View>
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: "700",
+                  color: theme.text,
+                  marginBottom: 8,
+                }}
+              >
+                Set Quick Play Sound?
+              </Text>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: theme.textSecondary,
+                  textAlign: "center",
+                  lineHeight: 22,
+                }}
+              >
+                {selectedSoundForConfirm?.name} will be your quick play sound
+                for instant access.
+              </Text>
+            </View>
+
+            <View style={{ gap: 12 }}>
+              <TouchableOpacity
+                onPress={confirmQuickPlaySelection}
+                style={{
+                  backgroundColor: theme.primary,
+                  padding: 16,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "white",
+                    fontSize: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  Confirm
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setSelectedSoundForConfirm(null)}
+                style={{
+                  backgroundColor: theme.border,
+                  padding: 16,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: theme.text,
+                    fontSize: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Clear Quick Play Modal */}
+      <Modal
+        visible={confirmClearQuickPlayVisible}
+        animationType="fade"
+        transparent
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              maxWidth: 400,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            <View
+              style={{
+                alignItems: "center",
+                marginBottom: 20,
+              }}
+            >
+              <View
+                style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 30,
+                  backgroundColor: theme.error + "20",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: 16,
+                }}
+              >
+                <Ionicons name="trash" size={32} color={theme.error} />
+              </View>
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: "700",
+                  color: theme.text,
+                  marginBottom: 8,
+                }}
+              >
+                Clear Quick Play?
+              </Text>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: theme.textSecondary,
+                  textAlign: "center",
+                  lineHeight: 22,
+                }}
+              >
+                Are you sure you want to clear your quick play sound?
+              </Text>
+            </View>
+
+            <View style={{ gap: 12 }}>
+              <TouchableOpacity
+                onPress={confirmClearQuickPlay}
+                style={{
+                  backgroundColor: theme.error,
+                  padding: 16,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "white",
+                    fontSize: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  Clear
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setConfirmClearQuickPlayVisible(false)}
+                style={{
+                  backgroundColor: theme.border,
+                  padding: 16,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: theme.text,
+                    fontSize: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Message Modal */}
+      <Modal visible={successMessageVisible} animationType="fade" transparent>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 16,
+              padding: 20,
+              width: "100%",
+              maxWidth: 400,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 16,
+            }}
+          >
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: theme.success + "20",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons
+                name="checkmark-circle"
+                size={32}
+                color={theme.success}
+              />
+            </View>
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 16,
+                color: theme.text,
+                fontWeight: "600",
+              }}
+            >
+              {successMessage}
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Clear Favorites Modal */}
+      <Modal
+        visible={confirmClearFavoritesVisible}
+        animationType="fade"
+        transparent
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              maxWidth: 400,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            <View
+              style={{
+                alignItems: "center",
+                marginBottom: 20,
+              }}
+            >
+              <View
+                style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 30,
+                  backgroundColor: theme.error + "20",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: 16,
+                }}
+              >
+                <Ionicons name="trash" size={32} color={theme.error} />
+              </View>
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: "700",
+                  color: theme.text,
+                  marginBottom: 8,
+                }}
+              >
+                Clear All Favorites?
+              </Text>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: theme.textSecondary,
+                  textAlign: "center",
+                  lineHeight: 22,
+                }}
+              >
+                Are you sure you want to clear all {favoritesCount} favorite
+                sound{favoritesCount === 1 ? "" : "s"}?
+              </Text>
+            </View>
+
+            <View style={{ gap: 12 }}>
+              <TouchableOpacity
+                onPress={confirmClearFavorites}
+                style={{
+                  backgroundColor: theme.error,
+                  padding: 16,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "white",
+                    fontSize: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  Clear All
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setConfirmClearFavoritesVisible(false)}
+                style={{
+                  backgroundColor: theme.border,
+                  padding: 16,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: theme.text,
+                    fontSize: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Info Modal (for background play and no favorites messages) */}
+      <Modal visible={infoModalVisible} animationType="fade" transparent>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              maxWidth: 400,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            <View
+              style={{
+                alignItems: "center",
+                marginBottom: 20,
+              }}
+            >
+              <View
+                style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 30,
+                  backgroundColor: theme.primary + "20",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: 16,
+                }}
+              >
+                <Ionicons
+                  name={infoModalContent.icon}
+                  size={32}
+                  color={theme.primary}
+                />
+              </View>
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: "700",
+                  color: theme.text,
+                  marginBottom: 8,
+                  textAlign: "center",
+                }}
+              >
+                {infoModalContent.title}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: theme.textSecondary,
+                  textAlign: "center",
+                  lineHeight: 22,
+                }}
+              >
+                {infoModalContent.message}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setInfoModalVisible(false)}
+              style={{
+                backgroundColor: theme.primary,
+                padding: 16,
+                borderRadius: 12,
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: "white",
+                  fontSize: 16,
+                  fontWeight: "600",
+                }}
+              >
+                Got it!
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
