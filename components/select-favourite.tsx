@@ -24,7 +24,7 @@ const Storage = {
 export default function SelectFavoriteScreen({ navigation }: any) {
   const handleSelect = async (id: number) => {
     await Storage.setItem("favorite_sound_id", String(id));
-    Alert.alert("Favourite Set", "This sound is now your panic button sound.");
+    Alert.alert("Favourite Set", "This sound is now your favourite sound.");
     navigation.goBack();
   };
 

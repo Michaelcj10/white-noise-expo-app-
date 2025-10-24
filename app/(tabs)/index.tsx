@@ -41,6 +41,7 @@ const isAndroid = Platform.OS === "android";
 
 /* ---------- Storage (web-safe) ---------- */
 const ENTITLEMENT_KEY = "entitlement_pro";
+const FAVORITES_KEY = "favorite_sound_ids";
 
 const Storage = {
   async getItem(key: string) {
@@ -66,6 +67,9 @@ function MixerModal({
   activeSounds,
   onToggleSound,
   onVolumeChange,
+  favorites,
+  onToggleFavorite,
+  pro,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -76,6 +80,9 @@ function MixerModal({
   >;
   onToggleSound: (soundItem: any) => void;
   onVolumeChange: (soundId: number, volume: number) => void;
+  favorites: Set<number>;
+  onToggleFavorite: (soundId: number) => void;
+  pro: boolean;
 }) {
   const [localVolumes, setLocalVolumes] = useState<Map<number, number>>(
     new Map()
@@ -260,6 +267,7 @@ function MixerModal({
               const isActive = activeSounds.has(soundItem.id);
               const soundData = activeSounds.get(soundItem.id);
               const volume = localVolumes.get(soundItem.id) || 0.5;
+              const isLocked = soundItem.premium && !pro;
 
               return (
                 <View
@@ -317,6 +325,34 @@ function MixerModal({
                         {soundItem.description}
                       </Text>
                     </View>
+                    {!isLocked && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          Haptics.impactAsync(
+                            Haptics.ImpactFeedbackStyle.Light
+                          );
+                          onToggleFavorite(soundItem.id);
+                        }}
+                        style={{
+                          padding: 8,
+                          marginRight: 8,
+                        }}
+                      >
+                        <Ionicons
+                          name={
+                            favorites?.has(soundItem.id)
+                              ? "heart"
+                              : "heart-outline"
+                          }
+                          size={24}
+                          color={
+                            favorites?.has(soundItem.id)
+                              ? "#FF6B6B"
+                              : theme.textSecondary
+                          }
+                        />
+                      </TouchableOpacity>
+                    )}
                     <Switch
                       value={isActive}
                       onValueChange={() => onToggleSound(soundItem)}
@@ -570,16 +606,37 @@ function TimerModal({
             maxHeight: "70%",
           }}
         >
-          <Text
+          <View
             style={{
-              fontSize: 22,
-              fontWeight: "700",
-              color: theme.text,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
               marginBottom: 6,
             }}
           >
-            Sleep Timer
-          </Text>
+            <Text
+              style={{
+                fontSize: 22,
+                fontWeight: "700",
+                color: theme.text,
+              }}
+            >
+              Sleep Timer
+            </Text>
+            <TouchableOpacity
+              onPress={onClose}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: theme.border,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="close" size={20} color={theme.text} />
+            </TouchableOpacity>
+          </View>
           <Text
             style={{
               opacity: 0.7,
@@ -688,9 +745,9 @@ export default function SoundsScreen() {
     >
   >(new Map());
 
-  const [selectedCategory, setSelectedCategory] = useState<SoundCategory>(
-    SOUND_CATEGORIES.ALL
-  );
+  const [selectedCategory, setSelectedCategory] = useState<
+    SoundCategory | "Favourites"
+  >(SOUND_CATEGORIES.ALL);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [globalMuted, setGlobalMuted] = useState(false);
@@ -705,6 +762,13 @@ export default function SoundsScreen() {
   // Paywall state
   const [pro, setPro] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
+
+  // Favorites state
+  const [favorites, setFavorites] = useState<Set<number>>(new Set());
+
+  // Snackbar state for favorites feedback
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const snackbarOpacity = useRef(new Animated.Value(0)).current;
 
   const playerSlide = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -890,6 +954,64 @@ export default function SoundsScreen() {
       ]).start();
     }
   }, [activeSounds.size, playerSlide, overlayOpacity]);
+
+  // Load favorites from storage
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const stored = await Storage.getItem(FAVORITES_KEY);
+        if (stored) {
+          const ids = JSON.parse(stored);
+          setFavorites(new Set(ids));
+        }
+      } catch (error) {
+        console.error("Error loading favorites:", error);
+      }
+    };
+    loadFavorites();
+  }, []);
+
+  // Save favorites to storage whenever they change
+  const saveFavorites = async (newFavorites: Set<number>) => {
+    try {
+      const ids = Array.from(newFavorites);
+      await Storage.setItem(FAVORITES_KEY, JSON.stringify(ids));
+    } catch (error) {
+      console.error("Error saving favorites:", error);
+    }
+  };
+
+  // Toggle favorite
+  const toggleFavorite = (soundId: number) => {
+    const newFavorites = new Set(favorites);
+    if (newFavorites.has(soundId)) {
+      newFavorites.delete(soundId);
+      showSnackbar("Removed from favorites");
+    } else {
+      newFavorites.add(soundId);
+      showSnackbar("Added to favorites");
+    }
+    setFavorites(newFavorites);
+    saveFavorites(newFavorites);
+  };
+
+  // Show snackbar animation
+  const showSnackbar = (message: string) => {
+    setSnackbarMessage(message);
+    Animated.sequence([
+      Animated.timing(snackbarOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.delay(2000),
+      Animated.timing(snackbarOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setSnackbarMessage(""));
+  };
 
   // Toggle sound in mixer
   const toggleSoundInMixer = async (soundItem: any) => {
@@ -1131,23 +1253,52 @@ export default function SoundsScreen() {
             )}
           </View>
 
-          {locked ? (
-            <View style={{ padding: 8 }}>
-              <Ionicons
-                name="lock-closed"
-                size={20}
-                color={theme.textSecondary}
-              />
-            </View>
-          ) : isActive || isQuickPlayActive ? (
-            <View style={styles.playingIndicator}>
-              <Ionicons
-                name={isPlaying ? "volume-high" : "volume-mute"}
-                size={20}
-                color={soundItem.color}
-              />
-            </View>
-          ) : null}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {/* Heart icon for favorites - only show if not locked */}
+            {!locked && (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  toggleFavorite(soundItem.id);
+                }}
+                style={{
+                  padding: 8,
+                }}
+              >
+                <Ionicons
+                  name={
+                    favorites?.has(soundItem.id) ? "heart" : "heart-outline"
+                  }
+                  size={22}
+                  color={
+                    favorites?.has(soundItem.id)
+                      ? "#FF6B6B"
+                      : theme.textSecondary
+                  }
+                />
+              </TouchableOpacity>
+            )}
+
+            {/* Lock or playing indicator */}
+            {locked ? (
+              <View style={{ padding: 8 }}>
+                <Ionicons
+                  name="lock-closed"
+                  size={20}
+                  color={theme.textSecondary}
+                />
+              </View>
+            ) : isActive || isQuickPlayActive ? (
+              <View style={styles.playingIndicator}>
+                <Ionicons
+                  name={isPlaying ? "volume-high" : "volume-mute"}
+                  size={20}
+                  color={soundItem.color}
+                />
+              </View>
+            ) : null}
+          </View>
         </TouchableOpacity>
       </View>
     );
@@ -1179,7 +1330,48 @@ export default function SoundsScreen() {
           />
         </View>
       </View>
-      <View style={styles.categoryTabs}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoryTabs}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          gap: 8,
+          alignItems: "center",
+        }}
+      >
+        {/* Show Favourites category first if there are any favorites */}
+        {favorites && favorites.size > 0 && (
+          <TouchableOpacity
+            key="Favourites"
+            style={[
+              styles.categoryTab,
+              {
+                backgroundColor:
+                  selectedCategory === "Favourites"
+                    ? theme.primary
+                    : theme.surface,
+                borderColor: theme.border,
+              },
+            ]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSelectedCategory("Favourites");
+            }}
+          >
+            <Text
+              style={[
+                styles.categoryTabText,
+                {
+                  color:
+                    selectedCategory === "Favourites" ? "white" : theme.text,
+                },
+              ]}
+            >
+              Favourites
+            </Text>
+          </TouchableOpacity>
+        )}
         {Object.values(SOUND_CATEGORIES).map((category) => (
           <TouchableOpacity
             key={category}
@@ -1208,7 +1400,7 @@ export default function SoundsScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
       <View style={styles.soundsList}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -1217,11 +1409,17 @@ export default function SoundsScreen() {
             setScrollViewRef("index", ref);
           }}
         >
-          {WHITE_NOISE_SOUNDS.filter(
-            (sound) =>
+          {WHITE_NOISE_SOUNDS.filter((sound) => {
+            // Handle Favourites category
+            if (selectedCategory === "Favourites") {
+              return favorites?.has(sound.id) || false;
+            }
+            // Handle regular categories
+            return (
               selectedCategory === SOUND_CATEGORIES.ALL ||
               sound.category === selectedCategory
-          ).map((soundItem, index) => (
+            );
+          }).map((soundItem, index) => (
             <SoundCard key={soundItem.id} soundItem={soundItem} index={index} />
           ))}
           <View style={{ height: 100 }} />
@@ -1333,6 +1531,9 @@ export default function SoundsScreen() {
         activeSounds={activeSounds}
         onToggleSound={toggleSoundInMixer}
         onVolumeChange={changeSoundVolume}
+        favorites={favorites}
+        onToggleFavorite={toggleFavorite}
+        pro={pro}
       />
       {/* Timer Modal */}
       <TimerModal
@@ -1342,6 +1543,38 @@ export default function SoundsScreen() {
         theme={theme}
         currentTimer={timerMinutes}
       />
+
+      {/* Snackbar for favorites feedback */}
+      {snackbarMessage !== "" && (
+        <Animated.View
+          style={{
+            position: "absolute",
+            bottom: 100,
+            left: 20,
+            right: 20,
+            backgroundColor: theme.text,
+            padding: 16,
+            borderRadius: 12,
+            opacity: snackbarOpacity,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+            elevation: 5,
+          }}
+        >
+          <Text
+            style={{
+              color: theme.background,
+              fontSize: 14,
+              fontWeight: "600",
+              textAlign: "center",
+            }}
+          >
+            {snackbarMessage}
+          </Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1397,11 +1630,8 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 28, fontWeight: "bold", marginBottom: 8 },
   categoryTabs: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 8,
     paddingBottom: 10,
+    maxHeight: 50,
   },
   image: {
     width: 300,

@@ -4,8 +4,9 @@ import { useBackgroundPlay } from "@/contexts/backgroundplay";
 import { useScroll } from "@/contexts/scroll";
 import { useTheme } from "@/contexts/themecontext";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -38,6 +39,8 @@ const Storage = {
   },
 };
 
+const FAVORITES_KEY = "favorite_sound_ids";
+
 export default function SettingsScreen() {
   const { theme, themeMode, toggleTheme } = useTheme();
   const { backgroundPlayEnabled, setBackgroundPlayEnabled } =
@@ -50,14 +53,36 @@ export default function SettingsScreen() {
   const [aboutModalVisible, setAboutModalVisible] = useState(false);
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [pro, setPro] = useState(false);
+  const [favoritesCount, setFavoritesCount] = useState(0);
 
-  // Load saved favourite + pro entitlement
+  // Load saved favourite + pro entitlement + favorites count
   useEffect(() => {
     (async () => {
       const storedId = await Storage.getItem("favorite_sound_id");
       if (storedId) setFavoriteSoundId(storedId);
+
+      const storedFavorites = await Storage.getItem(FAVORITES_KEY);
+      if (storedFavorites) {
+        const ids = JSON.parse(storedFavorites);
+        setFavoritesCount(ids.length);
+      }
     })();
   }, []);
+
+  // Reload favorites count when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const storedFavorites = await Storage.getItem(FAVORITES_KEY);
+        if (storedFavorites) {
+          const ids = JSON.parse(storedFavorites);
+          setFavoritesCount(ids.length);
+        } else {
+          setFavoritesCount(0);
+        }
+      })();
+    }, [])
+  );
 
   const SettingItem = ({
     icon,
@@ -159,8 +184,34 @@ export default function SettingsScreen() {
     setFavoriteSoundId(String(id));
     setModalVisible(false);
     Alert.alert(
-      "Favourite Set",
-      `${sound.name} is now your panic button sound.`
+      "Quick Play Set",
+      `${sound.name} is now your quick play sound.`
+    );
+  };
+
+  const handleClearFavorites = () => {
+    if (favoritesCount === 0) {
+      Alert.alert("No Favorites", "You don't have any favorite sounds yet.");
+      return;
+    }
+
+    Alert.alert(
+      "Clear All Favorites",
+      `Are you sure you want to clear all ${favoritesCount} favorite sound${
+        favoritesCount === 1 ? "" : "s"
+      }?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            await Storage.setItem(FAVORITES_KEY, JSON.stringify([]));
+            setFavoritesCount(0);
+            Alert.alert("Cleared", "All favorites have been cleared.");
+          },
+        },
+      ]
     );
   };
 
@@ -247,8 +298,8 @@ export default function SettingsScreen() {
         />
 
         <SettingItem
-          icon="heart"
-          title="Favourite Sound"
+          icon="flash"
+          title="Quick Play Sound"
           description={
             favoriteSoundId
               ? `Current: ${
@@ -256,11 +307,26 @@ export default function SettingsScreen() {
                     (s) => String(s.id) === favoriteSoundId
                   )?.name
                 }`
-              : "No favourite selected"
+              : "No quick play sound selected"
           }
           onPress={() => setModalVisible(true)}
           showArrow={true}
           color={theme.forest}
+        />
+
+        <SettingItem
+          icon="trash"
+          title="Clear Favorites"
+          description={
+            favoritesCount > 0
+              ? `${favoritesCount} favorite sound${
+                  favoritesCount === 1 ? "" : "s"
+                }`
+              : "No favorites to clear"
+          }
+          onPress={handleClearFavorites}
+          showArrow={true}
+          color={theme.error}
         />
 
         <SectionHeader title="Support" />
@@ -299,16 +365,63 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
 
-      {/* Favourite Sound Modal */}
+      {/* Quick Play Sound Modal */}
       <Modal visible={modalVisible} animationType="slide">
         <SafeAreaView
           style={[styles.container, { backgroundColor: theme.background }]}
         >
           <View style={styles.header}>
             <Text style={[styles.title, { color: theme.text }]}>
-              Select Favourite Sound
+              Select Quick Play Sound
             </Text>
           </View>
+          {favoriteSoundId && (
+            <TouchableOpacity
+              style={{
+                marginHorizontal: 16,
+                marginBottom: 8,
+                padding: 12,
+                backgroundColor: theme.error,
+                borderRadius: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              onPress={() => {
+                Alert.alert(
+                  "Clear Quick Play",
+                  "Are you sure you want to clear your quick play sound?",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Clear",
+                      style: "destructive",
+                      onPress: async () => {
+                        await Storage.setItem("favorite_sound_id", "");
+                        setFavoriteSoundId(null);
+                        setModalVisible(false);
+                        Alert.alert(
+                          "Cleared",
+                          "Quick play sound has been cleared."
+                        );
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="trash" size={20} color="white" />
+              <Text
+                style={{
+                  color: "white",
+                  marginLeft: 8,
+                  fontWeight: "600",
+                }}
+              >
+                Clear Quick Play
+              </Text>
+            </TouchableOpacity>
+          )}
           <FlatList
             data={WHITE_NOISE_SOUNDS}
             keyExtractor={(item) => item.id.toString()}

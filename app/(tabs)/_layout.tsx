@@ -240,7 +240,7 @@ export default function TabLayout() {
         redirect={false}
         name="panic"
         options={{
-          title: favoriteSoundId ? "Quick Play" : "Set Favorite",
+          title: favoriteSoundId ? "Quick Play" : "Set Quick Play",
           tabBarIcon: ({ color, focused }) => <PanicButton />,
         }}
         listeners={{
