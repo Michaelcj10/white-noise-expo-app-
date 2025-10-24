@@ -358,6 +358,172 @@ function MixerModal({
   );
 }
 
+/* ---------- Sound Options Modal ---------- */
+function SoundOptionsModal({
+  visible,
+  onClose,
+  theme,
+  sound,
+  onPlay,
+  onMixerPress,
+  onTimerPress,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  theme: any;
+  sound: any;
+  onPlay: () => void;
+  onMixerPress: () => void;
+  onTimerPress: () => void;
+}) {
+  if (!sound) return null;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "#0006",
+          justifyContent: "flex-end",
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: theme.surface,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            padding: 24,
+            borderTopWidth: 1,
+            borderColor: theme.border,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 20,
+            }}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: sound.color,
+                justifyContent: "center",
+                alignItems: "center",
+                marginRight: 12,
+              }}
+            >
+              <Ionicons name={sound.icon} size={20} color="white" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{ fontSize: 20, fontWeight: "600", color: theme.text }}
+              >
+                {sound.name}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: theme.textSecondary,
+                  marginTop: 2,
+                }}
+              >
+                {sound.description}
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => {
+              onPlay();
+              onClose();
+            }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              padding: 16,
+              backgroundColor: theme.primary,
+              borderRadius: 12,
+              marginBottom: 12,
+            }}
+          >
+            <Ionicons name="play" size={20} color="white" />
+            <Text style={{ color: "white", marginLeft: 12, fontWeight: "600" }}>
+              Play Sound
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              onMixerPress();
+              onClose();
+            }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              padding: 16,
+              backgroundColor: theme.card,
+              borderRadius: 12,
+              marginBottom: 12,
+            }}
+          >
+            <Ionicons name="options" size={20} color={theme.text} />
+            <Text
+              style={{
+                color: theme.text,
+                marginLeft: 12,
+                fontWeight: "600",
+              }}
+            >
+              Mix with Other Sounds
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              onTimerPress();
+              onClose();
+            }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              padding: 16,
+              backgroundColor: theme.card,
+              borderRadius: 12,
+              marginBottom: 12,
+            }}
+          >
+            <Ionicons name="timer" size={20} color={theme.text} />
+            <Text
+              style={{
+                color: theme.text,
+                marginLeft: 12,
+                fontWeight: "600",
+              }}
+            >
+              Set Timer
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onClose}
+            style={{
+              padding: 16,
+              alignItems: "center",
+              backgroundColor: theme.border,
+              borderRadius: 12,
+            }}
+          >
+            <Text style={{ color: theme.text, fontWeight: "500" }}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 /* ---------- Timer Modal ---------- */
 function TimerModal({
   visible,
@@ -926,7 +1092,6 @@ export default function SoundsScreen() {
       // Gate playback
       tryPlaySingle(soundItem);
     };
-
     const locked = soundItem.premium && !pro;
 
     return (

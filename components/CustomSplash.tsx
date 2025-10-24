@@ -1,27 +1,62 @@
 import { useTheme } from "@/contexts/themecontext";
 import { Image } from "expo-image";
-import React from "react";
-import { StyleSheet, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useEffect, useRef } from "react";
+import { Animated, StyleSheet } from "react-native";
 
 const darkLogo = require("../assets/images/slumbr_logo_dark.svg");
 const whiteLogo = require("../assets/images/slumbr_logo_light.svg");
 
-interface SplashScreenProps {}
+export const CustomSplash: React.FC = () => {
+  const { themeMode } = useTheme();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
-export const CustomSplash: React.FC<SplashScreenProps> = () => {
-  const { theme, themeMode } = useTheme();
+  useEffect(() => {
+    // Start both animations in parallel
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, scaleAnim]);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.logoContainer}>
+    <LinearGradient
+      colors={
+        themeMode === "dark"
+          ? ["#000000", "#1a1a1a", "#2d2d2d"]
+          : ["#ffffff", "#f5f5f5", "#e0e0e0"]
+      }
+      style={styles.container}
+      locations={[0, 0.3, 1]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <Animated.View
+        style={[
+          styles.logoContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }],
+          },
+        ]}
+      >
         <Image
           style={styles.logo}
           source={themeMode === "dark" ? darkLogo : whiteLogo}
           contentFit="contain"
           transition={1000}
         />
-      </View>
-    </View>
+      </Animated.View>
+    </LinearGradient>
   );
 };
 

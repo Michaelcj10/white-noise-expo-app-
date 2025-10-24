@@ -3,7 +3,7 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import "react-native-reanimated";
 import { ThemeProvider } from "../contexts/themecontext";
@@ -12,29 +12,42 @@ import { BackgroundPlayProvider } from "@/contexts/backgroundplay";
 import { QuickPlayProvider } from "@/contexts/quickplay";
 import { ScrollProvider } from "@/contexts/scroll";
 
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* ignore errors */
+});
+
 export default function RootLayout() {
+  const [pristine, setPristine] = useState(true);
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
 
   useEffect(() => {
+    // Initialize app
     async function prepare() {
       try {
+        // Artificially delay for consistent splash screen experience
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // If fonts are loaded, start transitioning
         if (loaded) {
-          // Keep splash screen visible while we fetch resources
-          await SplashScreen.preventAutoHideAsync();
-          // Hide after a delay to show our custom splash
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          // Show our custom splash for a minimum duration
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          // Hide the native splash screen
           await SplashScreen.hideAsync();
+          // Mark the app as ready to show
+          setPristine(false);
         }
       } catch (error) {
         console.warn("Error preparing app:", error);
       }
     }
+
     prepare();
   }, [loaded]);
 
-  if (loaded) {
+  if (!loaded || pristine) {
     return (
       <ThemeProvider>
         <CustomSplash />
