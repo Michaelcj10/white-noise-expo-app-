@@ -49,6 +49,7 @@ export default function TabLayout() {
     setFavoriteSoundId,
     isQuickPlaying,
     setIsQuickPlaying,
+    stopMainSounds,
   } = useQuickPlay();
   const [quickPlaySound, setQuickPlaySound] = useState<any>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -106,6 +107,11 @@ export default function TabLayout() {
         setQuickPlaySound(null);
         setIsQuickPlaying(false);
       } else {
+        // Stop main screen sounds if any are playing
+        if (stopMainSounds) {
+          await stopMainSounds();
+        }
+
         // Start quick play
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,

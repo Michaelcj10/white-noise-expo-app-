@@ -201,6 +201,7 @@ export default function SettingsScreen() {
       return;
     }
 
+    setModalVisible(false);
     setSelectedSoundForConfirm({ id, name: sound.name });
   };
 
@@ -213,7 +214,6 @@ export default function SettingsScreen() {
     );
     setFavoriteSoundId(String(selectedSoundForConfirm.id));
     setSelectedSoundForConfirm(null);
-    setModalVisible(false);
 
     // Show success message
     setSuccessMessage(
@@ -227,7 +227,6 @@ export default function SettingsScreen() {
     await Storage.setItem("favorite_sound_id", "");
     setFavoriteSoundId(null);
     setConfirmClearQuickPlayVisible(false);
-    setModalVisible(false);
 
     // Show success message
     setSuccessMessage("Quick play sound has been cleared.");
@@ -429,6 +428,7 @@ export default function SettingsScreen() {
                 justifyContent: "center",
               }}
               onPress={() => {
+                setModalVisible(false);
                 setConfirmClearQuickPlayVisible(true);
               }}
             >

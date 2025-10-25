@@ -71,6 +71,7 @@ function MixerModal({
   favorites,
   onToggleFavorite,
   pro,
+  isPlaying,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -84,6 +85,7 @@ function MixerModal({
   favorites: Set<number>;
   onToggleFavorite: (soundId: number) => void;
   pro: boolean;
+  isPlaying: boolean;
 }) {
   const [localVolumes, setLocalVolumes] = useState<Map<number, number>>(
     new Map()
@@ -216,7 +218,12 @@ function MixerModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View
         style={{
           flex: 1,
@@ -269,6 +276,15 @@ function MixerModal({
               const soundData = activeSounds.get(soundItem.id);
               const volume = localVolumes.get(soundItem.id) || 0.5;
               const isLocked = soundItem.premium && !pro;
+
+              // First sound in the map is the original sound that started playing
+              const firstSoundId =
+                activeSounds.size > 0
+                  ? Array.from(activeSounds.keys())[0]
+                  : null;
+              const isFirstSound = isActive && soundItem.id === firstSoundId;
+              const cannotUnselect =
+                isFirstSound && isPlaying && activeSounds.size > 1;
 
               return (
                 <View
@@ -354,9 +370,18 @@ function MixerModal({
                         />
                       </TouchableOpacity>
                     )}
+                    {cannotUnselect && (
+                      <Ionicons
+                        name="lock-closed"
+                        size={16}
+                        color={theme.textSecondary}
+                        style={{ marginRight: 8, opacity: 0.6 }}
+                      />
+                    )}
                     <Switch
                       value={isActive}
                       onValueChange={() => onToggleSound(soundItem)}
+                      disabled={cannotUnselect}
                       trackColor={{
                         false: theme.border,
                         true: theme.primary,
@@ -588,7 +613,12 @@ function TimerModal({
   ];
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View
         style={{
           flex: 1,
@@ -727,7 +757,12 @@ function TimerModal({
 export default function SoundsScreen() {
   const { theme, themeMode } = useTheme();
   const { backgroundPlayEnabled } = useBackgroundPlay();
-  const { isQuickPlaying, favoriteSoundId } = useQuickPlay();
+  const {
+    isQuickPlaying,
+    favoriteSoundId,
+    setIsMainPlaying,
+    setStopMainSounds,
+  } = useQuickPlay();
   const { setScrollViewRef } = useScroll();
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -859,6 +894,21 @@ export default function SoundsScreen() {
       }
     };
   }, [timerMinutes, isPlaying]);
+
+  // Sync main playing state to context for quick play button
+  useEffect(() => {
+    setIsMainPlaying(isPlaying);
+  }, [isPlaying, setIsMainPlaying]);
+
+  // Register stopAllSounds callback with context
+  useEffect(() => {
+    setStopMainSounds(() => async () => {
+      await stopAllSounds();
+    });
+    return () => {
+      setStopMainSounds(null);
+    };
+  }, [setStopMainSounds]);
 
   const configureAudioSession = async () => {
     try {
@@ -1008,6 +1058,11 @@ export default function SoundsScreen() {
     if (newFavorites.has(soundId)) {
       newFavorites.delete(soundId);
       showSnackbar("Removed from favorites");
+
+      // If we're viewing Favourites and this was the last one, switch to All
+      if (selectedCategory === "Favourites" && newFavorites.size === 0) {
+        setSelectedCategory(SOUND_CATEGORIES.ALL);
+      }
     } else {
       newFavorites.add(soundId);
       showSnackbar("Added to favorites");
@@ -1100,6 +1155,15 @@ export default function SoundsScreen() {
 
     if (soundItem.premium && !entitled) {
       setPaywallOpen(true);
+      return;
+    }
+
+    // If this sound is already the only one playing, do nothing
+    if (
+      activeSounds.size === 1 &&
+      activeSounds.has(soundItem.id) &&
+      isPlaying
+    ) {
       return;
     }
 
@@ -1547,7 +1611,10 @@ export default function SoundsScreen() {
       {/* Mixer Modal */}
       <MixerModal
         visible={mixerModalVisible}
-        onClose={() => setMixerModalVisible(false)}
+        onClose={() => {
+          stopAllSounds();
+          setMixerModalVisible(false);
+        }}
         theme={theme}
         activeSounds={activeSounds}
         onToggleSound={toggleSoundInMixer}
@@ -1555,11 +1622,15 @@ export default function SoundsScreen() {
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
         pro={pro}
+        isPlaying={isPlaying}
       />
       {/* Timer Modal */}
       <TimerModal
         visible={timerModalVisible}
-        onClose={() => setTimerModalVisible(false)}
+        onClose={() => {
+          stopAllSounds();
+          setTimerModalVisible(false);
+        }}
         onSetTimer={handleSetTimer}
         theme={theme}
         currentTimer={timerMinutes}
