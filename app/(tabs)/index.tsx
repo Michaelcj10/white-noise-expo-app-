@@ -1,4 +1,5 @@
 import {
+  CATEGORY_COLORS,
   SOUND_CATEGORIES,
   SoundCategory,
   WHITE_NOISE_SOUNDS,
@@ -10,6 +11,7 @@ import * as Haptics from "expo-haptics";
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useScroll } from "@/contexts/scroll";
 import { useFocusEffect } from "@react-navigation/native";
+import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -753,6 +755,89 @@ function TimerModal({
   );
 }
 
+/* ================== SOUND VISUALIZER ================== */
+function SoundVisualizer({
+  isPlaying,
+  activeSoundsCount,
+}: {
+  isPlaying: boolean;
+  activeSoundsCount: number;
+}) {
+  const { theme } = useTheme();
+  const bars = useRef(
+    Array.from({ length: 20 }, () => new Animated.Value(0.3))
+  ).current;
+
+  useEffect(() => {
+    if (isPlaying && activeSoundsCount > 0) {
+      const animations = bars.map((bar, index) => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(bar, {
+              toValue: Math.random() * 0.7 + 0.3,
+              duration: 300 + Math.random() * 400,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(bar, {
+              toValue: Math.random() * 0.5 + 0.2,
+              duration: 300 + Math.random() * 400,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      });
+
+      animations.forEach((anim) => anim.start());
+
+      return () => {
+        animations.forEach((anim) => anim.stop());
+      };
+    } else {
+      bars.forEach((bar) => {
+        Animated.timing(bar, {
+          toValue: 0.1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
+    }
+  }, [isPlaying, activeSoundsCount, bars]);
+
+  return (
+    <View
+      style={{
+        height: 60,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 3,
+        paddingHorizontal: 20,
+        marginBottom: 12,
+      }}
+    >
+      {bars.map((bar, index) => (
+        <Animated.View
+          key={index}
+          style={{
+            width: 3,
+            height: "100%",
+            backgroundColor: theme.primary,
+            borderRadius: 2,
+            opacity: 0.7,
+            transform: [
+              {
+                scaleY: bar,
+              },
+            ],
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
 /* ================== YOUR SCREEN (with gate) ================== */
 export default function SoundsScreen() {
   const { theme, themeMode } = useTheme();
@@ -773,6 +858,7 @@ export default function SoundsScreen() {
     Map<
       number,
       {
+        id: number;
         sound: any;
         soundItem: any;
         volume: number;
@@ -808,35 +894,23 @@ export default function SoundsScreen() {
 
   const playerSlide = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const [isGesturing, setIsGesturing] = useState(false);
 
-  const playerPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        setIsGesturing(true);
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        if (gestureState.dy > 0) {
-          playerSlide.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        setIsGesturing(false);
-        if (gestureState.dy > 100) {
-          stopAllSounds();
-        } else {
-          Animated.spring(playerSlide, {
-            toValue: 0,
-            tension: 50,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
+  const handleClosePlayer = () => {
+    Animated.parallel([
+      Animated.timing(playerSlide, {
+        toValue: 300,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      stopAllSounds();
+    });
+  };
 
   useEffect(() => {
     configureAudioSession();
@@ -900,16 +974,6 @@ export default function SoundsScreen() {
     setIsMainPlaying(isPlaying);
   }, [isPlaying, setIsMainPlaying]);
 
-  // Register stopAllSounds callback with context
-  useEffect(() => {
-    setStopMainSounds(() => async () => {
-      await stopAllSounds();
-    });
-    return () => {
-      setStopMainSounds(null);
-    };
-  }, [setStopMainSounds]);
-
   const configureAudioSession = async () => {
     try {
       // On web, setAudioModeAsync is a no-op; guard just in case
@@ -924,6 +988,26 @@ export default function SoundsScreen() {
       }
     } catch (error) {
       console.error("Error configuring audio session:", error);
+    }
+  };
+
+  const updateNowPlayingInfo = async () => {
+    try {
+      if (!isWeb && activeSounds.size > 0) {
+        const soundNames = Array.from(activeSounds.values())
+          .map((data) => {
+            const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === data.id);
+            return sound?.name || "Unknown";
+          })
+          .join(", ");
+
+        // This would require expo-av's Audio.setNowPlayingInfo (if available)
+        // Since expo-av is being deprecated, this is a placeholder for future implementation
+        // with expo-audio or react-native-track-player
+        console.log("Now Playing:", soundNames);
+      }
+    } catch (error) {
+      console.error("Error updating now playing info:", error);
     }
   };
 
@@ -971,6 +1055,11 @@ export default function SoundsScreen() {
       });
     };
   }, []);
+
+  // Update lock screen info when active sounds change
+  useEffect(() => {
+    updateNowPlayingInfo();
+  }, [activeSounds, isPlaying]);
 
   useEffect(() => {
     if (activeSounds.size > 0) {
@@ -1119,6 +1208,7 @@ export default function SoundsScreen() {
           soundItem,
           volume: 0.5,
           isMuted: globalMuted,
+          id: 0,
         });
       } catch (error) {
         Alert.alert("Error", "Could not play sound. Please try again later.");
@@ -1226,7 +1316,7 @@ export default function SoundsScreen() {
     }
   };
 
-  const stopAllSounds = async () => {
+  const stopAllSounds = useCallback(async () => {
     try {
       // Clear timer first
       if (timerIntervalRef.current) {
@@ -1254,10 +1344,25 @@ export default function SoundsScreen() {
       Alert.alert("Error", "Could not stop sounds.");
       console.error("Error stopping sounds:", error);
     }
-  };
+  }, [activeSounds]);
+
+  // Register stopAllSounds callback with context - use ref to avoid re-renders
+  const stopAllSoundsRef = useRef(stopAllSounds);
+
+  useEffect(() => {
+    stopAllSoundsRef.current = stopAllSounds;
+  }, [stopAllSounds]);
+
+  useEffect(() => {
+    const wrappedStopAll = () => stopAllSoundsRef.current();
+    setStopMainSounds(wrappedStopAll);
+    return () => {
+      setStopMainSounds(null);
+    };
+  }, [setStopMainSounds]);
 
   const handleOverlayPress = () => {
-    stopAllSounds();
+    handleClosePlayer();
   };
 
   const handleSetTimer = (minutes: number | null) => {
@@ -1294,6 +1399,9 @@ export default function SoundsScreen() {
     const isQuickPlayActive =
       isQuickPlaying && favoriteSoundId === String(soundItem.id);
 
+    const translateX = useRef(new Animated.Value(0)).current;
+    const swipeThreshold = 80;
+
     const handlePress = () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       // Gate playback
@@ -1301,90 +1409,162 @@ export default function SoundsScreen() {
     };
     const locked = soundItem.premium && !pro;
 
+    const panResponder = useRef(
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => !locked,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return !locked && Math.abs(gestureState.dx) > 5;
+        },
+        onPanResponderGrant: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        },
+        onPanResponderMove: (_, gestureState) => {
+          if (gestureState.dx > 0) {
+            translateX.setValue(
+              Math.min(gestureState.dx, swipeThreshold * 1.5)
+            );
+          }
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dx > swipeThreshold) {
+            // Swipe right to favorite
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            toggleFavorite(soundItem.id);
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              friction: 8,
+            }).start();
+          } else {
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              friction: 8,
+            }).start();
+          }
+        },
+      })
+    ).current;
+
     return (
-      <View>
-        <TouchableOpacity
-          style={[
-            styles.soundCard,
-            { backgroundColor: theme.surface, borderColor: theme.border },
-            (isActive || isQuickPlayActive) && {
-              borderColor: theme.primary,
-              backgroundColor: theme.card,
-            },
-            locked && { opacity: 0.9 },
-          ]}
-          onPress={handlePress}
-          activeOpacity={0.8}
+      <View style={{ position: "relative" }}>
+        {/* Heart indicator behind the card */}
+        <Animated.View
+          style={{
+            position: "absolute",
+            left: 16,
+            top: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+            width: 60,
+            opacity: translateX.interpolate({
+              inputRange: [0, swipeThreshold],
+              outputRange: [0, 1],
+              extrapolate: "clamp",
+            }),
+          }}
         >
-          <View
-            style={[styles.iconContainer, { backgroundColor: soundItem.color }]}
+          <Ionicons name="heart" size={32} color="#FF6B6B" />
+        </Animated.View>
+
+        <Animated.View
+          style={{
+            transform: [{ translateX }],
+          }}
+          {...panResponder.panHandlers}
+        >
+          <TouchableOpacity
+            style={[
+              styles.soundCard,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              (isActive || isQuickPlayActive) && {
+                borderColor: theme.primary,
+                backgroundColor: theme.card,
+              },
+              locked && { opacity: 0.9 },
+            ]}
+            onPress={handlePress}
+            activeOpacity={0.8}
           >
-            <Ionicons name={soundItem.icon} size={24} color="white" />
-          </View>
-
-          <View style={styles.soundInfo}>
-            <Text style={[styles.soundName, { color: theme.text }]}>
-              {soundItem.name}
-            </Text>
-            <Text
-              style={[styles.soundDescription, { color: theme.textSecondary }]}
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: soundItem.color },
+              ]}
             >
-              {soundItem.description}
-            </Text>
-            {(isActive || isQuickPlayActive) && (
-              <Text style={[styles.playingText, { color: theme.primary }]}>
-                Playing
+              <Ionicons name={soundItem.icon} size={24} color="white" />
+            </View>
+
+            <View style={styles.soundInfo}>
+              <Text style={[styles.soundName, { color: theme.text }]}>
+                {soundItem.name}
               </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            {/* Heart icon for favorites - only show if not locked */}
-            {!locked && (
-              <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation();
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  toggleFavorite(soundItem.id);
-                }}
-                style={{
-                  padding: 8,
-                }}
+              <Text
+                style={[
+                  styles.soundDescription,
+                  { color: theme.textSecondary },
+                ]}
               >
-                <Ionicons
-                  name={
-                    favorites?.has(soundItem.id) ? "heart" : "heart-outline"
-                  }
-                  size={22}
-                  color={
-                    favorites?.has(soundItem.id)
-                      ? "#FF6B6B"
-                      : theme.textSecondary
-                  }
-                />
-              </TouchableOpacity>
-            )}
+                {soundItem.description}
+              </Text>
+              {(isActive || isQuickPlayActive) && (
+                <Text style={[styles.playingText, { color: theme.primary }]}>
+                  Playing
+                </Text>
+              )}
+            </View>
 
-            {/* Lock or playing indicator */}
-            {locked ? (
-              <View style={{ padding: 8 }}>
-                <Ionicons
-                  name="lock-closed"
-                  size={20}
-                  color={theme.textSecondary}
-                />
-              </View>
-            ) : isActive || isQuickPlayActive ? (
-              <View style={styles.playingIndicator}>
-                <Ionicons
-                  name={isPlaying ? "volume-high" : "volume-mute"}
-                  size={20}
-                  color={soundItem.color}
-                />
-              </View>
-            ) : null}
-          </View>
-        </TouchableOpacity>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              {/* Heart icon for favorites - only show if not locked */}
+              {!locked && (
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    toggleFavorite(soundItem.id);
+                  }}
+                  style={{
+                    padding: 8,
+                  }}
+                >
+                  <Ionicons
+                    name={
+                      favorites?.has(soundItem.id) ? "heart" : "heart-outline"
+                    }
+                    size={22}
+                    color={
+                      favorites?.has(soundItem.id)
+                        ? "#FF6B6B"
+                        : theme.textSecondary
+                    }
+                  />
+                </TouchableOpacity>
+              )}
+
+              {/* Lock or playing indicator */}
+              {locked ? (
+                <View style={{ padding: 8 }}>
+                  <Ionicons
+                    name="lock-closed"
+                    size={20}
+                    color={theme.textSecondary}
+                  />
+                </View>
+              ) : isActive || isQuickPlayActive ? (
+                <View style={styles.playingIndicator}>
+                  <Ionicons
+                    name={isPlaying ? "volume-high" : "volume-mute"}
+                    size={20}
+                    color={soundItem.color}
+                  />
+                </View>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     );
   }
@@ -1464,7 +1644,9 @@ export default function SoundsScreen() {
               styles.categoryTab,
               {
                 backgroundColor:
-                  selectedCategory === category ? theme.primary : theme.surface,
+                  selectedCategory === category
+                    ? CATEGORY_COLORS[category]
+                    : theme.surface,
                 borderColor: theme.border,
               },
             ]}
@@ -1512,13 +1694,19 @@ export default function SoundsScreen() {
       </View>
       {activeSounds.size > 0 && (
         <>
-          {/* Overlay */}
+          {/* Overlay with Blur */}
           <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-            <TouchableOpacity
-              style={styles.overlayTouchable}
-              onPress={handleOverlayPress}
-              activeOpacity={1}
-            />
+            <BlurView
+              intensity={20}
+              tint={themeMode === "dark" ? "dark" : "light"}
+              style={StyleSheet.absoluteFill}
+            >
+              <TouchableOpacity
+                style={styles.overlayTouchable}
+                onPress={handleOverlayPress}
+                activeOpacity={1}
+              />
+            </BlurView>
           </Animated.View>
 
           <Animated.View
@@ -1530,15 +1718,23 @@ export default function SoundsScreen() {
                 transform: [{ translateY: playerSlide }],
               },
             ]}
-            {...playerPanResponder.panHandlers}
           >
-            <View style={styles.pullHandle}>
-              <Ionicons
-                name="chevron-down"
-                size={24}
-                color={theme.textSecondary}
-              />
+            {/* Close Button */}
+            <View style={styles.playerHeader}>
+              <TouchableOpacity
+                onPress={handleClosePlayer}
+                style={[styles.closeButton, { backgroundColor: theme.border }]}
+              >
+                <Ionicons name="close" size={16} color={theme.textSecondary} />
+              </TouchableOpacity>
             </View>
+
+            {/* Sound Visualizer */}
+            <SoundVisualizer
+              isPlaying={isPlaying}
+              activeSoundsCount={activeSounds.size}
+            />
+
             <View style={styles.nowPlaying}>
               <Text
                 style={[styles.nowPlayingText, { color: theme.textSecondary }]}
@@ -1586,16 +1782,6 @@ export default function SoundsScreen() {
                 iconColor={timerMinutes ? "white" : theme.text}
               />
               <AnimatedControlButton
-                onPress={toggleGlobalMute}
-                iconName={globalMuted ? "volume-mute" : "volume-high"}
-                style={{
-                  backgroundColor: globalMuted ? theme.error : theme.card,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                }}
-                iconColor={globalMuted ? "white" : theme.text}
-              />
-              <AnimatedControlButton
                 onPress={isPlaying ? pauseAllSounds : resumeAllSounds}
                 iconName={isPlaying ? "pause" : "play"}
               />
@@ -1628,7 +1814,6 @@ export default function SoundsScreen() {
       <TimerModal
         visible={timerModalVisible}
         onClose={() => {
-          stopAllSounds();
           setTimerModalVisible(false);
         }}
         onSetTimer={handleSetTimer}
@@ -1790,10 +1975,16 @@ const styles = StyleSheet.create({
     elevation: 8,
     zIndex: 2,
   },
-  pullHandle: {
+  playerHeader: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    marginBottom: 8,
+  },
+  closeButton: {
+    padding: 6,
+    borderRadius: 12,
   },
   nowPlaying: { alignItems: "center", marginBottom: 16 },
   nowPlayingText: {

@@ -4,6 +4,7 @@ import { useQuickPlay } from "@/contexts/quickplay";
 import { useScroll } from "@/contexts/scroll";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
+import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tabs, useRouter } from "expo-router";
@@ -85,6 +86,9 @@ export default function TabLayout() {
   }, []);
 
   const handlePanicPress = async () => {
+    // Light haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     if (!favoriteSoundId) {
       setShowNoQuickPlayModal(true);
       return;
@@ -108,7 +112,7 @@ export default function TabLayout() {
         setIsQuickPlaying(false);
       } else {
         // Stop main screen sounds if any are playing
-        if (stopMainSounds) {
+        if (stopMainSounds && typeof stopMainSounds === "function") {
           await stopMainSounds();
         }
 
