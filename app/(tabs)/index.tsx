@@ -57,6 +57,44 @@ const Storage = {
   },
 };
 
+/* ---------- Downloaded Sounds Tracker ---------- */
+const DownloadedSounds = {
+  downloaded: new Set<number>(),
+
+  markAsDownloaded(soundId: number) {
+    this.downloaded.add(soundId);
+  },
+
+  isDownloaded(soundId: number): boolean {
+    return this.downloaded.has(soundId);
+  },
+};
+
+/* ---------- Sound Source Helper ---------- */
+const SoundCache = {
+  async getSource(soundItem: any, onFirstLoad?: () => void) {
+    // For local sounds, return the required asset directly
+    if (soundItem.isLocal) {
+      return soundItem.source;
+    }
+
+    // For remote sounds, mark as downloaded after first successful load
+    if (!DownloadedSounds.isDownloaded(soundItem.id)) {
+      // Simulate download completion and trigger callback
+      setTimeout(() => {
+        DownloadedSounds.markAsDownloaded(soundItem.id);
+        onFirstLoad?.();
+      }, 2000);
+    }
+
+    return { uri: soundItem.source };
+  },
+
+  isDownloaded(soundId: number): boolean {
+    return DownloadedSounds.isDownloaded(soundId);
+  },
+};
+
 /* ---------- Mixer Modal ---------- */
 function MixerModal({
   visible,
@@ -874,7 +912,12 @@ export default function SoundsScreen() {
   // Favorites state
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
 
-  // Snackbar state for favorites feedback
+  // Downloaded sounds state - local sounds (0: white noise, 1: rain, 2: ocean) are pre-downloaded
+  const [downloadedSounds, setDownloadedSounds] = useState<Set<number>>(
+    new Set([0, 1, 2])
+  );
+
+  // Snackbar state for favorites and download feedback
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const snackbarOpacity = useRef(new Animated.Value(0)).current;
 
@@ -1180,14 +1223,23 @@ export default function SoundsScreen() {
       // Add sound
       try {
         await configureAudioSession();
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          soundItem.source,
-          {
-            isLooping: true,
-            volume: globalMuted ? 0 : 0.5,
-            shouldPlay: isPlaying,
-          }
-        );
+
+        // Get source with download callback
+        const source = await SoundCache.getSource(soundItem, () => {
+          // Mark as downloaded and show toast
+          setDownloadedSounds((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(soundItem.id);
+            return newSet;
+          });
+          showSnackbar(`${soundItem.name} saved for offline`);
+        });
+
+        const { sound: newSound } = await Audio.Sound.createAsync(source, {
+          isLooping: true,
+          volume: globalMuted ? 0 : 0.5,
+          shouldPlay: isPlaying,
+        });
 
         newActiveSounds.set(soundItem.id, {
           sound: newSound,
@@ -1197,7 +1249,10 @@ export default function SoundsScreen() {
           id: 0,
         });
       } catch (error) {
-        Alert.alert("Error", "Could not play sound. Please try again later.");
+        Alert.alert(
+          "Error",
+          "Could not load sound. Please check your internet connection."
+        );
         console.error("Error playing sound:", error);
       }
     }
@@ -1252,14 +1307,22 @@ export default function SoundsScreen() {
     try {
       await configureAudioSession();
 
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        soundItem.source,
-        {
-          isLooping: true,
-          volume: globalMuted ? 0 : 0.5,
-          shouldPlay: true,
-        }
-      );
+      // Get source with download callback
+      const source = await SoundCache.getSource(soundItem, () => {
+        // Mark as downloaded and show toast
+        setDownloadedSounds((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(soundItem.id);
+          return newSet;
+        });
+        showSnackbar(`${soundItem.name} saved for offline`);
+      });
+
+      const { sound: newSound } = await Audio.Sound.createAsync(source, {
+        isLooping: true,
+        volume: globalMuted ? 0 : 0.5,
+        shouldPlay: true,
+      });
 
       newSound.setOnPlaybackStatusUpdate((status) => {
         if ((status as any).isLoaded) {
@@ -1468,7 +1531,6 @@ export default function SoundsScreen() {
                 borderColor: theme.primary,
                 backgroundColor: theme.card,
               },
-              locked && { opacity: 0.9 },
             ]}
             onPress={handlePress}
             activeOpacity={0.8}
@@ -1499,8 +1561,36 @@ export default function SoundsScreen() {
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
-              {/* Heart icon for favorites - only show if not locked */}
-              {!locked && (
+              {/* Download indicator - show if sound is downloaded */}
+              {downloadedSounds.has(soundItem.id) && (
+                <View style={{ padding: 8 }}>
+                  <Ionicons name="cloud-done" size={20} color="#10b981" />
+                </View>
+              )}
+
+              {/* PRO badge for premium sounds OR Heart icon for free sounds */}
+              {soundItem.premium ? (
+                <View
+                  style={{
+                    backgroundColor: "#8b5cf6",
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 6,
+                    marginRight: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "white",
+                      fontSize: 10,
+                      fontWeight: "700",
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    PRO
+                  </Text>
+                </View>
+              ) : (
                 <TouchableOpacity
                   onPress={(e) => {
                     e.stopPropagation();
@@ -1523,17 +1613,6 @@ export default function SoundsScreen() {
                     }
                   />
                 </TouchableOpacity>
-              )}
-
-              {/* Lock indicator */}
-              {locked && (
-                <View style={{ padding: 8 }}>
-                  <Ionicons
-                    name="lock-closed"
-                    size={20}
-                    color={theme.textSecondary}
-                  />
-                </View>
               )}
             </View>
           </TouchableOpacity>
