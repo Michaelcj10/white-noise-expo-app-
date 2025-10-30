@@ -173,9 +173,7 @@ export default function TabLayout() {
           width: 64,
           height: 64,
           borderRadius: 32,
-          backgroundColor: isQuickPlaying
-            ? theme.error
-            : favoriteSound?.color || theme.primary,
+          backgroundColor: isQuickPlaying ? theme.error : theme.success,
           justifyContent: "center",
           alignItems: "center",
           shadowColor: "#000",

@@ -18,36 +18,37 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 });
 
 export default function RootLayout() {
-  const [pristine, setPristine] = useState(true);
+  const [appReady, setAppReady] = useState(false);
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
 
   useEffect(() => {
-    // Initialize app
     async function prepare() {
       try {
-        // Artificially delay for consistent splash screen experience
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        // If fonts are loaded, start transitioning
+        // Wait for fonts to load
         if (loaded) {
-          // Show our custom splash for a minimum duration
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          // Hide the native splash screen
+          // Hide native splash immediately since we have custom splash
           await SplashScreen.hideAsync();
-          // Mark the app as ready to show
-          setPristine(false);
+
+          // Show custom splash for minimum duration (better UX)
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+
+          // Mark app as ready
+          setAppReady(true);
         }
       } catch (error) {
         console.warn("Error preparing app:", error);
+        // Ensure app shows even if there's an error
+        setAppReady(true);
       }
     }
 
     prepare();
   }, [loaded]);
 
-  if (!loaded || pristine) {
+  // Show custom splash while loading fonts or during minimum splash duration
+  if (!loaded || !appReady) {
     return (
       <ThemeProvider>
         <CustomSplash />

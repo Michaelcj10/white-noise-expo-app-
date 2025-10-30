@@ -5,6 +5,7 @@ import { useScroll } from "@/contexts/scroll";
 import { useTheme } from "@/contexts/themecontext";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -21,6 +22,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const darkLogo = require("../../assets/images/slumbr_logo_dark.svg");
+const whiteLogo = require("../../assets/images/slumbr_logo_light.svg");
 
 /** Web + native storage shim */
 const Storage = {
@@ -399,9 +403,12 @@ export default function SettingsScreen() {
         />
 
         <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: theme.textSecondary }]}>
-            Slumbr v1.0.0
-          </Text>
+          <Image
+            style={styles.footerLogo}
+            source={themeMode === "dark" ? darkLogo : whiteLogo}
+            contentFit="contain"
+            transition={1000}
+          />
         </View>
       </ScrollView>
 
@@ -1112,6 +1119,10 @@ const styles = StyleSheet.create({
   settingTitle: { fontSize: 16, fontWeight: "600", marginBottom: 2 },
   settingDescription: { fontSize: 14, lineHeight: 18 },
   footer: { alignItems: "center", paddingVertical: 40, paddingBottom: 100 },
+  footerLogo: {
+    width: 200,
+    height: 60,
+  },
   footerText: { fontSize: 16, fontWeight: "600" },
   footerSubText: { fontSize: 14, marginTop: 4 },
 

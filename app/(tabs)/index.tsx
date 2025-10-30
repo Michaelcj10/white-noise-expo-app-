@@ -12,7 +12,6 @@ import { useQuickPlay } from "@/contexts/quickplay";
 import { useScroll } from "@/contexts/scroll";
 import { useFocusEffect } from "@react-navigation/native";
 import { BlurView } from "expo-blur";
-import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -34,9 +33,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useBackgroundPlay } from "../../contexts/backgroundplay";
 import { useTheme } from "../../contexts/themecontext";
-
-const darkLogo = require("../../assets/images/slumbr_logo_dark.svg");
-const whiteLogo = require("../../assets/images/slumbr_logo_light.svg");
 
 /* ---------- Platform helpers ---------- */
 const isWeb = Platform.OS === "web";
@@ -1577,24 +1573,31 @@ export default function SoundsScreen() {
         barStyle={themeMode === "dark" ? "light-content" : "dark-content"}
         backgroundColor={theme.background}
       />
-      <View style={styles.header}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            flex: 1,
-            width: "100%",
-          }}
-        >
-          <Image
-            style={styles.image}
-            source={themeMode === "dark" ? darkLogo : whiteLogo}
-            contentFit="contain"
-            transition={1000}
-          />
+
+      {/* Pro Upgrade Banner */}
+      <TouchableOpacity
+        style={[
+          styles.proBanner,
+          {
+            backgroundColor: "#8b5cf6",
+          },
+        ]}
+        activeOpacity={0.8}
+      >
+        <View style={styles.proBannerContent}>
+          <View style={styles.proBannerIcon}>
+            <Ionicons name="star" size={20} color="#FFD700" />
+          </View>
+          <View style={styles.proBannerText}>
+            <Text style={styles.proBannerTitle}>Upgrade to Pro</Text>
+            <Text style={styles.proBannerSubtitle}>
+              Unlock all premium sounds & features
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="white" />
         </View>
-      </View>
+      </TouchableOpacity>
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -1900,6 +1903,46 @@ function AnimatedControlButton({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  proBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  proBannerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    gap: 12,
+  },
+  proBannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  proBannerText: {
+    flex: 1,
+  },
+  proBannerTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "white",
+    marginBottom: 2,
+  },
+  proBannerSubtitle: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.9)",
+    fontWeight: "500",
+  },
   header: {
     padding: 10,
     alignItems: "center",
@@ -1907,7 +1950,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 28, fontWeight: "bold", marginBottom: 8 },
   categoryTabs: {
-    paddingBottom: 10,
+    paddingBottom: 6,
     maxHeight: 50,
   },
   image: {
