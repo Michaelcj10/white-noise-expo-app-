@@ -11,7 +11,6 @@ import * as Haptics from "expo-haptics";
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useScroll } from "@/contexts/scroll";
 import { useFocusEffect } from "@react-navigation/native";
-import { BlurView } from "expo-blur";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -300,7 +299,6 @@ function MixerModal({
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
-                      marginBottom: isActive ? 12 : 0,
                     }}
                   >
                     <View
@@ -387,14 +385,6 @@ function MixerModal({
                       thumbColor={isActive ? "white" : theme.textSecondary}
                     />
                   </View>
-
-                  {isActive && (
-                    <VolumeSlider
-                      soundId={soundItem.id}
-                      soundItem={soundItem}
-                      volume={volume}
-                    />
-                  )}
                 </View>
               );
             })}
@@ -1504,11 +1494,6 @@ export default function SoundsScreen() {
               >
                 {soundItem.description}
               </Text>
-              {(isActive || isQuickPlayActive) && (
-                <Text style={[styles.playingText, { color: theme.primary }]}>
-                  Playing
-                </Text>
-              )}
             </View>
 
             <View
@@ -1540,8 +1525,8 @@ export default function SoundsScreen() {
                 </TouchableOpacity>
               )}
 
-              {/* Lock or playing indicator */}
-              {locked ? (
+              {/* Lock indicator */}
+              {locked && (
                 <View style={{ padding: 8 }}>
                   <Ionicons
                     name="lock-closed"
@@ -1549,15 +1534,7 @@ export default function SoundsScreen() {
                     color={theme.textSecondary}
                   />
                 </View>
-              ) : isActive || isQuickPlayActive ? (
-                <View style={styles.playingIndicator}>
-                  <Ionicons
-                    name={isPlaying ? "volume-high" : "volume-mute"}
-                    size={20}
-                    color={soundItem.color}
-                  />
-                </View>
-              ) : null}
+              )}
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -1697,70 +1674,43 @@ export default function SoundsScreen() {
       </View>
       {activeSounds.size > 0 && (
         <>
-          {/* Overlay with Blur */}
-          <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-            <BlurView
-              intensity={20}
-              tint={themeMode === "dark" ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
-            >
-              <TouchableOpacity
-                style={styles.overlayTouchable}
-                onPress={handleOverlayPress}
-                activeOpacity={1}
-              />
-            </BlurView>
-          </Animated.View>
-
           <Animated.View
             style={[
               styles.playerControls,
               {
-                backgroundColor: theme.tabBar,
+                backgroundColor: theme.surface,
                 borderTopColor: theme.border,
                 transform: [{ translateY: playerSlide }],
               },
             ]}
           >
-            {/* Close Button */}
-            <View style={styles.playerHeader}>
-              <TouchableOpacity
-                onPress={handleClosePlayer}
-                style={[styles.closeButton, { backgroundColor: theme.border }]}
+            {/* Timer display */}
+            {timerMinutes !== null && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  marginBottom: 8,
+                }}
               >
-                <Ionicons name="close" size={16} color={theme.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Sound Visualizer */}
-            <SoundVisualizer
-              isPlaying={isPlaying}
-              activeSoundsCount={activeSounds.size}
-            />
-
-            <View style={styles.nowPlaying}>
-              <Text
-                style={[styles.nowPlayingText, { color: theme.textSecondary }]}
-              >
-                Now Playing{" "}
-                {activeSounds.size > 1 ? `(${activeSounds.size} sounds)` : ""}
-              </Text>
-              <Text style={[styles.currentSoundName, { color: theme.text }]}>
-                {getCurrentSoundsDisplay()}
-              </Text>
-              {timerMinutes !== null && (
-                <View style={styles.timerDisplay}>
-                  <Ionicons
-                    name="timer-outline"
-                    size={16}
-                    color={theme.primary}
-                  />
-                  <Text style={[styles.timerText, { color: theme.primary }]}>
-                    {formatTime(timerSeconds)}
-                  </Text>
-                </View>
-              )}
-            </View>
+                <Ionicons
+                  name="timer-outline"
+                  size={14}
+                  color={theme.primary}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: theme.primary,
+                    fontWeight: "600",
+                  }}
+                >
+                  {formatTime(timerSeconds)}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.controlsRow}>
               <AnimatedControlButton
@@ -1801,7 +1751,6 @@ export default function SoundsScreen() {
       <MixerModal
         visible={mixerModalVisible}
         onClose={() => {
-          stopAllSounds();
           setMixerModalVisible(false);
         }}
         theme={theme}
@@ -2012,8 +1961,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 20,
-    paddingBottom: 100,
+    padding: 12,
+    paddingBottom: 80,
     borderTopWidth: 1,
     elevation: 8,
     zIndex: 2,
@@ -2040,15 +1989,14 @@ const styles = StyleSheet.create({
   controlsRow: {
     flexDirection: "row",
     justifyContent: "center",
-    marginBottom: 16,
+    gap: 8,
   },
   controlButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 6,
     elevation: 5,
   },
   volumeControl: {

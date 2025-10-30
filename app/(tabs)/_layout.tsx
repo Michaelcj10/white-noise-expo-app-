@@ -12,6 +12,7 @@ import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
+  Animated,
   Modal,
   Platform,
   ScrollView,
@@ -158,6 +159,29 @@ export default function TabLayout() {
     };
   }, [quickPlaySound]);
 
+  // Animation for panic button
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+
+  const animateButtonPress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.85,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handleButtonPress = () => {
+    animateButtonPress();
+    handlePanicPress();
+  };
+
   // Custom panic button component
   const PanicButton = () => {
     const favoriteSound = WHITE_NOISE_SOUNDS.find(
@@ -165,52 +189,58 @@ export default function TabLayout() {
     );
 
     return (
-      <TouchableOpacity
-        onPress={handlePanicPress}
+      <Animated.View
         style={{
-          position: "relative",
-          top: -15,
-          width: 64,
-          height: 64,
-          borderRadius: 32,
-          backgroundColor: isQuickPlaying ? theme.error : theme.success,
-          justifyContent: "center",
-          alignItems: "center",
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-          elevation: 8,
-          borderWidth: 3,
-          borderColor: "transparent",
+          transform: [{ scale: scaleAnim }],
         }}
       >
-        <Ionicons
-          name={
-            isQuickPlaying
-              ? "stop"
-              : ((favoriteSound?.icon ||
-                  "heart") as keyof typeof Ionicons.glyphMap)
-          }
-          size={28}
-          color="white"
-        />
-        {isQuickPlaying && (
-          <View
-            style={{
-              position: "absolute",
-              top: -4,
-              right: -4,
-              width: 12,
-              height: 12,
-              borderRadius: 6,
-              backgroundColor: theme.success,
-              borderWidth: 2,
-              borderColor: theme.background,
-            }}
+        <TouchableOpacity
+          onPress={handleButtonPress}
+          style={{
+            position: "relative",
+            top: -15,
+            width: 64,
+            height: 64,
+            borderRadius: 32,
+            backgroundColor: isQuickPlaying ? theme.error : theme.success,
+            justifyContent: "center",
+            alignItems: "center",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
+            borderWidth: 3,
+            borderColor: "transparent",
+          }}
+        >
+          <Ionicons
+            name={
+              isQuickPlaying
+                ? "stop"
+                : ((favoriteSound?.icon ||
+                    "heart") as keyof typeof Ionicons.glyphMap)
+            }
+            size={28}
+            color="white"
           />
-        )}
-      </TouchableOpacity>
+          {isQuickPlaying && (
+            <View
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -4,
+                width: 12,
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: theme.success,
+                borderWidth: 2,
+                borderColor: theme.background,
+              }}
+            />
+          )}
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
