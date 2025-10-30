@@ -8,8 +8,8 @@ export const themes = {
   dark: {
     // Core backgrounds - pure dark theme
     background: "#0A0903",
-    surface: "#221E22",
-    card: "#221E22",
+    surface: "#141214",
+    card: "#141214",
 
     // Borders and dividers - subtle contrast
     border: "#2a2a3a",
