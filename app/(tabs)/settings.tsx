@@ -1,6 +1,8 @@
 // app/(tabs)/settings.tsx
+import { PaywallModal } from "@/components/PaywallModal";
 import { WHITE_NOISE_SOUNDS } from "@/constants/sound";
 import { useBackgroundPlay } from "@/contexts/backgroundplay";
+import { useRevenueCat } from "@/contexts/revenuecat";
 import { useScroll } from "@/contexts/scroll";
 import { useTheme } from "@/contexts/themecontext";
 import { Ionicons } from "@expo/vector-icons";
@@ -52,11 +54,12 @@ export default function SettingsScreen() {
   const { setScrollViewRef } = useScroll();
   const scrollViewRef = useRef<ScrollView>(null);
 
+  const { isPro: pro } = useRevenueCat();
   const [favoriteSoundId, setFavoriteSoundId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [aboutModalVisible, setAboutModalVisible] = useState(false);
   const [contactModalVisible, setContactModalVisible] = useState(false);
-  const [pro, setPro] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [confirmClearQuickPlayVisible, setConfirmClearQuickPlayVisible] =
     useState(false);
@@ -202,6 +205,7 @@ export default function SettingsScreen() {
     // Check entitlement if premium
     if (sound.premium && !pro) {
       setModalVisible(false);
+      setPaywallOpen(true);
       return;
     }
 
@@ -288,7 +292,26 @@ export default function SettingsScreen() {
           <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
         )}
         {item.premium && !pro && (
-          <Ionicons name="lock-closed" size={20} color={theme.textSecondary} />
+          <View
+            style={{
+              backgroundColor: "#8b5cf6",
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 6,
+              marginLeft: 8,
+            }}
+          >
+            <Text
+              style={{
+                color: "white",
+                fontSize: 10,
+                fontWeight: "700",
+                letterSpacing: 0.5,
+              }}
+            >
+              PRO
+            </Text>
+          </View>
         )}
       </TouchableOpacity>
     );
@@ -402,6 +425,33 @@ export default function SettingsScreen() {
           color={theme.secondary}
         />
 
+        {!pro && (
+          <TouchableOpacity
+            onPress={() => setPaywallOpen(true)}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: "#8b5cf6",
+              padding: 16,
+              borderRadius: 12,
+              marginTop: 16,
+              marginHorizontal: 16,
+            }}
+          >
+            <Ionicons name="star" size={20} color="#fff" />
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: 16,
+                fontWeight: "600",
+                marginLeft: 12,
+              }}
+            >
+              Upgrade to Pro
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.footer}>
           <Image
             style={styles.footerLogo}
@@ -458,10 +508,16 @@ export default function SettingsScreen() {
             contentContainerStyle={{ padding: 16 }}
           />
           <TouchableOpacity
-            style={{ padding: 16, alignItems: "center" }}
+            style={{
+              margin: 16,
+              padding: 16,
+              backgroundColor: theme.error,
+              borderRadius: 12,
+              alignItems: "center",
+            }}
             onPress={() => setModalVisible(false)}
           >
-            <Text style={{ color: theme.primary }}>Cancel</Text>
+            <Text style={{ color: "white", fontWeight: "600" }}>Cancel</Text>
           </TouchableOpacity>
         </SafeAreaView>
       </Modal>
@@ -1076,6 +1132,11 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      <PaywallModal
+        visible={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+      />
     </SafeAreaView>
   );
 }

@@ -1,3 +1,4 @@
+import { PaywallModal } from "@/components/PaywallModal";
 import {
   CATEGORY_COLORS,
   SOUND_CATEGORIES,
@@ -9,6 +10,7 @@ import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
 
 import { useQuickPlay } from "@/contexts/quickplay";
+import { useRevenueCat } from "@/contexts/revenuecat";
 import { useScroll } from "@/contexts/scroll";
 import { useFocusEffect } from "@react-navigation/native";
 import * as SecureStore from "expo-secure-store";
@@ -376,7 +378,28 @@ function MixerModal({
                         {soundItem.description}
                       </Text>
                     </View>
-                    {!isLocked && (
+                    {isLocked ? (
+                      <View
+                        style={{
+                          backgroundColor: "#8b5cf6",
+                          paddingHorizontal: 10,
+                          paddingVertical: 4,
+                          borderRadius: 6,
+                          marginRight: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "white",
+                            fontSize: 10,
+                            fontWeight: "700",
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          PRO
+                        </Text>
+                      </View>
+                    ) : (
                       <TouchableOpacity
                         onPress={() => {
                           Haptics.impactAsync(
@@ -905,8 +928,10 @@ export default function SoundsScreen() {
   const [mixerModalVisible, setMixerModalVisible] = useState(false);
   const timerIntervalRef = useRef<any>(null);
 
+  // RevenueCat - check if user has Pro access
+  const { isPro: pro } = useRevenueCat();
+
   // Paywall state
-  const [pro, setPro] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   // Favorites state
@@ -1172,6 +1197,16 @@ export default function SoundsScreen() {
 
   // Toggle favorite
   const toggleFavorite = (soundId: number) => {
+    // Check if sound is premium
+    const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === soundId);
+    const isPremium = sound?.premium || false;
+
+    // Only require pro for premium sounds
+    if (isPremium && !pro) {
+      setPaywallOpen(true);
+      return;
+    }
+
     const newFavorites = new Set(favorites);
     if (newFavorites.has(soundId)) {
       newFavorites.delete(soundId);
@@ -1281,13 +1316,18 @@ export default function SoundsScreen() {
 
   // Play single sound (from main list)
   const tryPlaySingle = async (soundItem: any) => {
-    const entitled = true;
-    setPro(entitled);
+    // Check if sound is premium and user doesn't have pro
+    console.log(`Trying to play: ${soundItem.name}`);
+    console.log(`Is premium: ${soundItem.premium}`);
+    console.log(`User has pro: ${pro}`);
 
-    if (soundItem.premium && !entitled) {
+    if (soundItem.premium && !pro) {
+      console.log("Opening paywall for premium sound");
       setPaywallOpen(true);
       return;
     }
+
+    console.log("Playing sound");
 
     // If this sound is already the only one playing, do nothing
     if (
@@ -1448,175 +1488,99 @@ export default function SoundsScreen() {
     const isQuickPlayActive =
       isQuickPlaying && favoriteSoundId === String(soundItem.id);
 
-    const translateX = useRef(new Animated.Value(0)).current;
-    const swipeThreshold = 80;
-
     const handlePress = () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       // Gate playback
       tryPlaySingle(soundItem);
     };
-    const locked = soundItem.premium && !pro;
-
-    const panResponder = useRef(
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => !locked,
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          return !locked && Math.abs(gestureState.dx) > 5;
-        },
-        onPanResponderGrant: () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        },
-        onPanResponderMove: (_, gestureState) => {
-          if (gestureState.dx > 0) {
-            translateX.setValue(
-              Math.min(gestureState.dx, swipeThreshold * 1.5)
-            );
-          }
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dx > swipeThreshold) {
-            // Swipe right to favorite
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            toggleFavorite(soundItem.id);
-            Animated.spring(translateX, {
-              toValue: 0,
-              useNativeDriver: true,
-              friction: 8,
-            }).start();
-          } else {
-            Animated.spring(translateX, {
-              toValue: 0,
-              useNativeDriver: true,
-              friction: 8,
-            }).start();
-          }
-        },
-      })
-    ).current;
 
     return (
-      <View style={{ position: "relative" }}>
-        {/* Heart indicator behind the card */}
-        <Animated.View
-          style={{
-            position: "absolute",
-            left: 16,
-            top: 0,
-            bottom: 0,
-            justifyContent: "center",
-            alignItems: "center",
-            width: 60,
-            opacity: translateX.interpolate({
-              inputRange: [0, swipeThreshold],
-              outputRange: [0, 1],
-              extrapolate: "clamp",
-            }),
-          }}
+      <View>
+        <TouchableOpacity
+          style={[
+            styles.soundCard,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+            (isActive || isQuickPlayActive) && {
+              borderColor: theme.primary,
+              backgroundColor: theme.card,
+            },
+          ]}
+          onPress={handlePress}
+          activeOpacity={0.8}
         >
-          <Ionicons name="heart" size={32} color="#FF6B6B" />
-        </Animated.View>
-
-        <Animated.View
-          style={{
-            transform: [{ translateX }],
-          }}
-          {...panResponder.panHandlers}
-        >
-          <TouchableOpacity
-            style={[
-              styles.soundCard,
-              { backgroundColor: theme.surface, borderColor: theme.border },
-              (isActive || isQuickPlayActive) && {
-                borderColor: theme.primary,
-                backgroundColor: theme.card,
-              },
-            ]}
-            onPress={handlePress}
-            activeOpacity={0.8}
+          <View
+            style={[styles.iconContainer, { backgroundColor: soundItem.color }]}
           >
-            <View
-              style={[
-                styles.iconContainer,
-                { backgroundColor: soundItem.color },
-              ]}
-            >
-              <Ionicons name={soundItem.icon} size={24} color="white" />
-            </View>
+            <Ionicons name={soundItem.icon} size={24} color="white" />
+          </View>
 
-            <View style={styles.soundInfo}>
-              <Text style={[styles.soundName, { color: theme.text }]}>
-                {soundItem.name}
-              </Text>
-              <Text
-                style={[
-                  styles.soundDescription,
-                  { color: theme.textSecondary },
-                ]}
+          <View style={styles.soundInfo}>
+            <Text style={[styles.soundName, { color: theme.text }]}>
+              {soundItem.name}
+            </Text>
+            <Text
+              style={[styles.soundDescription, { color: theme.textSecondary }]}
+            >
+              {soundItem.description}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {/* Download indicator - show if sound is downloaded */}
+            {downloadedSounds.has(soundItem.id) && (
+              <View style={{ padding: 8 }}>
+                <Ionicons name="cloud-done" size={20} color="#10b981" />
+              </View>
+            )}
+
+            {/* PRO badge for premium sounds OR Heart icon for free sounds */}
+            {soundItem.premium ? (
+              <View
+                style={{
+                  backgroundColor: "#8b5cf6",
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  marginRight: 8,
+                }}
               >
-                {soundItem.description}
-              </Text>
-            </View>
-
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              {/* Download indicator - show if sound is downloaded */}
-              {downloadedSounds.has(soundItem.id) && (
-                <View style={{ padding: 8 }}>
-                  <Ionicons name="cloud-done" size={20} color="#10b981" />
-                </View>
-              )}
-
-              {/* PRO badge for premium sounds OR Heart icon for free sounds */}
-              {soundItem.premium ? (
-                <View
+                <Text
                   style={{
-                    backgroundColor: "#8b5cf6",
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 6,
-                    marginRight: 8,
+                    color: "white",
+                    fontSize: 10,
+                    fontWeight: "700",
+                    letterSpacing: 0.5,
                   }}
                 >
-                  <Text
-                    style={{
-                      color: "white",
-                      fontSize: 10,
-                      fontWeight: "700",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    PRO
-                  </Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    toggleFavorite(soundItem.id);
-                  }}
-                  style={{
-                    padding: 8,
-                  }}
-                >
-                  <Ionicons
-                    name={
-                      favorites?.has(soundItem.id) ? "heart" : "heart-outline"
-                    }
-                    size={22}
-                    color={
-                      favorites?.has(soundItem.id)
-                        ? "#FF6B6B"
-                        : theme.textSecondary
-                    }
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
+                  PRO
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  toggleFavorite(soundItem.id);
+                }}
+                style={{
+                  padding: 8,
+                }}
+              >
+                <Ionicons
+                  name={
+                    favorites?.has(soundItem.id) ? "heart" : "heart-outline"
+                  }
+                  size={22}
+                  color={
+                    favorites?.has(soundItem.id)
+                      ? "#FF6B6B"
+                      : theme.textSecondary
+                  }
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -1630,29 +1594,32 @@ export default function SoundsScreen() {
         backgroundColor={theme.background}
       />
 
-      {/* Pro Upgrade Banner */}
-      <TouchableOpacity
-        style={[
-          styles.proBanner,
-          {
-            backgroundColor: "#8b5cf6",
-          },
-        ]}
-        activeOpacity={0.8}
-      >
-        <View style={styles.proBannerContent}>
-          <View style={styles.proBannerIcon}>
-            <Ionicons name="star" size={20} color="#FFD700" />
+      {/* Pro Upgrade Banner - only show if not pro */}
+      {!pro && (
+        <TouchableOpacity
+          style={[
+            styles.proBanner,
+            {
+              backgroundColor: "#8b5cf6",
+            },
+          ]}
+          activeOpacity={0.8}
+          onPress={() => setPaywallOpen(true)}
+        >
+          <View style={styles.proBannerContent}>
+            <View style={styles.proBannerIcon}>
+              <Ionicons name="star" size={20} color="#FFD700" />
+            </View>
+            <View style={styles.proBannerText}>
+              <Text style={styles.proBannerTitle}>Upgrade to Pro</Text>
+              <Text style={styles.proBannerSubtitle}>
+                Unlock all premium sounds & features
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="white" />
           </View>
-          <View style={styles.proBannerText}>
-            <Text style={styles.proBannerTitle}>Upgrade to Pro</Text>
-            <Text style={styles.proBannerSubtitle}>
-              Unlock all premium sounds & features
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="white" />
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      )}
 
       <ScrollView
         horizontal
@@ -1745,9 +1712,22 @@ export default function SoundsScreen() {
               selectedCategory === SOUND_CATEGORIES.ALL ||
               sound.category === selectedCategory
             );
-          }).map((soundItem, index) => (
-            <SoundCard key={soundItem.id} soundItem={soundItem} index={index} />
-          ))}
+          })
+            .sort((a, b) => {
+              // Free sounds first, then premium
+              if (a.premium !== b.premium) {
+                return a.premium ? 1 : -1;
+              }
+              // Then alphabetically
+              return a.name.localeCompare(b.name);
+            })
+            .map((soundItem, index) => (
+              <SoundCard
+                key={soundItem.id}
+                soundItem={soundItem}
+                index={index}
+              />
+            ))}
           <View style={{ height: 100 }} />
         </ScrollView>
       </View>
@@ -1793,7 +1773,13 @@ export default function SoundsScreen() {
 
             <View style={styles.controlsRow}>
               <AnimatedControlButton
-                onPress={() => setMixerModalVisible(true)}
+                onPress={() => {
+                  if (!pro) {
+                    setPaywallOpen(true);
+                  } else {
+                    setMixerModalVisible(true);
+                  }
+                }}
                 iconName="options"
                 style={{
                   backgroundColor:
@@ -1857,7 +1843,7 @@ export default function SoundsScreen() {
         <Animated.View
           style={{
             position: "absolute",
-            bottom: 100,
+            top: 60,
             left: 20,
             right: 20,
             backgroundColor: theme.text,
@@ -1869,6 +1855,7 @@ export default function SoundsScreen() {
             shadowOpacity: 0.25,
             shadowRadius: 3.84,
             elevation: 5,
+            zIndex: 9999,
           }}
         >
           <Text
@@ -1883,6 +1870,12 @@ export default function SoundsScreen() {
           </Text>
         </Animated.View>
       )}
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+      />
     </SafeAreaView>
   );
 }

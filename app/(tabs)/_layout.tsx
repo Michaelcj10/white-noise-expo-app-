@@ -86,7 +86,12 @@ export default function TabLayout() {
     return () => clearInterval(interval);
   }, []);
 
-  const handlePanicPress = async () => {
+  const handlePanicPress = async (
+    e?: { preventDefault?: () => void } | any
+  ) => {
+    if (e && typeof (e as any).preventDefault === "function") {
+      (e as any).preventDefault();
+    }
     // Light haptic feedback
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -177,9 +182,9 @@ export default function TabLayout() {
     ]).start();
   };
 
-  const handleButtonPress = () => {
+  const handleButtonPress = (e: { preventDefault: () => void } | undefined) => {
     animateButtonPress();
-    handlePanicPress();
+    handlePanicPress(e);
   };
 
   // Custom panic button component
@@ -307,11 +312,11 @@ export default function TabLayout() {
             tabPress: (e) => {
               // Prevent navigation to a "panic" screen
               e.preventDefault();
-              handlePanicPress();
+              handlePanicPress(e);
             },
             tabLongPress: (e) => {
               // Also handle long press
-              handlePanicPress();
+              handlePanicPress(e);
             },
           }}
         />
@@ -632,9 +637,10 @@ export default function TabLayout() {
 
             <View style={{ gap: 12 }}>
               <TouchableOpacity
-                onPress={() => {
+                onPress={(e) => {
+                  e.preventDefault();
                   setShowNoQuickPlayModal(false);
-                  router.push("/settings");
+                  router.push("/(tabs)/settings");
                 }}
                 style={{
                   backgroundColor: theme.primary,
@@ -657,7 +663,7 @@ export default function TabLayout() {
               <TouchableOpacity
                 onPress={() => setShowNoQuickPlayModal(false)}
                 style={{
-                  backgroundColor: theme.border,
+                  backgroundColor: theme.error,
                   padding: 16,
                   borderRadius: 12,
                   alignItems: "center",
@@ -665,7 +671,7 @@ export default function TabLayout() {
               >
                 <Text
                   style={{
-                    color: theme.text,
+                    color: "white",
                     fontSize: 16,
                     fontWeight: "600",
                   }}

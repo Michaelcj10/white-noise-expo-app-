@@ -10,6 +10,7 @@ import { ThemeProvider } from "../contexts/themecontext";
 
 import { BackgroundPlayProvider } from "@/contexts/backgroundplay";
 import { QuickPlayProvider } from "@/contexts/quickplay";
+import { RevenueCatProvider } from "@/contexts/revenuecat";
 import { ScrollProvider } from "@/contexts/scroll";
 
 // Keep the splash screen visible while we fetch resources
@@ -58,17 +59,19 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <BackgroundPlayProvider>
-        <QuickPlayProvider>
-          <ScrollProvider>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="auto" />
-          </ScrollProvider>
-        </QuickPlayProvider>
-      </BackgroundPlayProvider>
+      <RevenueCatProvider>
+        <BackgroundPlayProvider>
+          <QuickPlayProvider>
+            <ScrollProvider>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <StatusBar style="auto" />
+            </ScrollProvider>
+          </QuickPlayProvider>
+        </BackgroundPlayProvider>
+      </RevenueCatProvider>
     </ThemeProvider>
   );
 }
