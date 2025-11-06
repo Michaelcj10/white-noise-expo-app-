@@ -31,6 +31,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBackgroundPlay } from "../../contexts/backgroundplay";
 import { useTheme } from "../../contexts/themecontext";
 
@@ -897,6 +898,7 @@ export default function SoundsScreen() {
   } = useQuickPlay();
   const { setScrollViewRef } = useScroll();
   const scrollViewRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   const [focusKey, setFocusKey] = useState(0);
 
@@ -1600,7 +1602,12 @@ export default function SoundsScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.background, paddingTop: insets.top },
+      ]}
+    >
       <StatusBar
         barStyle={themeMode === "dark" ? "light-content" : "dark-content"}
         backgroundColor={theme.background}
@@ -1749,7 +1756,7 @@ export default function SoundsScreen() {
             style={[
               styles.playerControls,
               {
-                backgroundColor: theme.surface,
+                backgroundColor: theme.background,
                 borderTopColor: theme.border,
                 transform: [{ translateY: playerSlide }],
               },
