@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 
 import "react-native-reanimated";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider } from "../contexts/themecontext";
 
 import { BackgroundPlayProvider } from "@/contexts/backgroundplay";
@@ -58,20 +59,25 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <RevenueCatProvider>
-        <BackgroundPlayProvider>
-          <QuickPlayProvider>
-            <ScrollProvider>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="auto" />
-            </ScrollProvider>
-          </QuickPlayProvider>
-        </BackgroundPlayProvider>
-      </RevenueCatProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <RevenueCatProvider>
+          <BackgroundPlayProvider>
+            <QuickPlayProvider>
+              <ScrollProvider>
+                <Stack>
+                  <Stack.Screen
+                    name="(tabs)"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+                <StatusBar style="auto" />
+              </ScrollProvider>
+            </QuickPlayProvider>
+          </BackgroundPlayProvider>
+        </RevenueCatProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

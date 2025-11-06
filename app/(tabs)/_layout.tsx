@@ -20,6 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../contexts/themecontext";
 
 const darkLogo = require("../../assets/images/slumbr_logo_dark.svg");
@@ -46,6 +47,7 @@ export default function TabLayout() {
   const { theme, themeMode } = useTheme();
   const router = useRouter();
   const { scrollToTop } = useScroll();
+  const insets = useSafeAreaInsets();
   const {
     favoriteSoundId,
     setFavoriteSoundId,
@@ -260,9 +262,9 @@ export default function TabLayout() {
             backgroundColor: theme.tabBar,
             borderTopColor: theme.tabBarBorder,
             borderTopWidth: 0,
-            paddingTop: 0,
-            paddingBottom: 8,
-            height: 100,
+            paddingTop: 8,
+            paddingBottom: insets.bottom > 0 ? insets.bottom + 4 : 24,
+            height: 70 + (insets.bottom > 0 ? insets.bottom + 4 : 24),
             shadowColor: "#000",
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: themeMode === "dark" ? 0.1 : 0.05,

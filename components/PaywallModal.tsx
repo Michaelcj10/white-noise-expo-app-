@@ -21,44 +21,41 @@ interface PaywallModalProps {
 
 export function PaywallModal({ visible, onClose }: PaywallModalProps) {
   const { theme } = useTheme();
-  const { offerings, purchasePackage, restorePurchases, isPro } =
+  const { isPro, offerings, purchasePackage, restorePurchases } =
     useRevenueCat();
   const [loading, setLoading] = useState(false);
 
   const handlePurchase = async (pkg: PurchasesPackage) => {
-    try {
-      setLoading(true);
-      await purchasePackage(pkg);
-      Alert.alert("Success!", "You now have access to all Pro features!");
+    setLoading(true);
+    const result = await purchasePackage(pkg);
+    setLoading(false);
+
+    if (result.success) {
+      Alert.alert(
+        "Welcome to Slumbr Pro!",
+        "You now have access to all premium sounds and features."
+      );
       onClose();
-    } catch (error: any) {
-      if (!error.userCancelled) {
-        Alert.alert("Purchase Failed", "Please try again later.");
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleRestore = async () => {
-    try {
-      setLoading(true);
-      await restorePurchases();
-      Alert.alert("Restored!", "Your purchases have been restored.");
+    setLoading(true);
+    const result = await restorePurchases();
+    setLoading(false);
+
+    if (result.success) {
       onClose();
-    } catch (error) {
-      Alert.alert("Restore Failed", "No purchases found to restore.");
-    } finally {
-      setLoading(false);
     }
   };
 
+  // Don't show paywall if already pro
   if (isPro) {
     return null;
   }
 
   const features = [
-    { icon: "musical-notes", text: "Access to all 24 premium sounds" },
+    { icon: "musical-notes", text: "Access to all 21 premium sounds" },
     { icon: "cloud-done", text: "Offline mode for all sounds" },
     { icon: "infinite", text: "Unlimited sound mixing" },
     { icon: "timer", text: "Advanced timer options" },
@@ -87,6 +84,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
           <TouchableOpacity
             style={[styles.closeButton, { backgroundColor: theme.border }]}
             onPress={onClose}
+            disabled={loading}
           >
             <Ionicons name="close" size={24} color={theme.text} />
           </TouchableOpacity>
@@ -98,7 +96,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                 <Ionicons name="star" size={32} color="#FFD700" />
               </View>
               <Text style={[styles.title, { color: theme.text }]}>
-                Upgrade to Pro
+                Upgrade to Slumbr Pro
               </Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
                 Unlock all premium sounds and features
@@ -124,37 +122,53 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
             </View>
 
             {/* Pricing */}
-            {offerings?.availablePackages && (
+            {offerings?.availablePackages &&
+            offerings.availablePackages.length > 0 ? (
               <View style={styles.pricing}>
-                {offerings.availablePackages.map((pkg: PurchasesPackage) => (
-                  <TouchableOpacity
-                    key={pkg.identifier}
-                    style={[styles.priceButton, { backgroundColor: "#8b5cf6" }]}
-                    onPress={() => handlePurchase(pkg)}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="white" />
-                    ) : (
-                      <>
-                        <Text style={styles.priceTitle}>
-                          {pkg.product.title}
-                        </Text>
-                        <Text style={styles.priceAmount}>
-                          {pkg.product.priceString}
-                          {pkg.packageType === "MONTHLY" && "/month"}
-                          {pkg.packageType === "ANNUAL" && "/year"}
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                ))}
+                {offerings.availablePackages.map((pkg) => {
+                  const isPopular = pkg.packageType === "ANNUAL";
+                  return (
+                    <TouchableOpacity
+                      key={pkg.identifier}
+                      style={[
+                        styles.priceButton,
+                        { backgroundColor: theme.primary },
+                        isPopular && styles.popularButton,
+                      ]}
+                      onPress={() => handlePurchase(pkg)}
+                      disabled={loading}
+                    >
+                      {isPopular && (
+                        <View style={styles.popularBadge}>
+                          <Text style={styles.popularText}>BEST VALUE</Text>
+                        </View>
+                      )}
+                      {loading ? (
+                        <ActivityIndicator color="white" />
+                      ) : (
+                        <>
+                          <Text style={styles.priceTitle}>
+                            {pkg.product.title}
+                          </Text>
+                          <Text style={styles.priceAmount}>
+                            {pkg.product.priceString}
+                            {pkg.packageType === "MONTHLY" && "/month"}
+                            {pkg.packageType === "ANNUAL" && "/year"}
+                          </Text>
+                          {pkg.packageType === "LIFETIME" && (
+                            <Text style={styles.priceSubtext}>
+                              One-time payment
+                            </Text>
+                          )}
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            )}
-
-            {!offerings?.availablePackages && (
+            ) : (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#8b5cf6" />
+                <ActivityIndicator size="large" color={theme.primary} />
                 <Text
                   style={[styles.loadingText, { color: theme.textSecondary }]}
                 >
@@ -259,6 +273,25 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 16,
     alignItems: "center",
+    position: "relative",
+  },
+  popularButton: {
+    borderWidth: 2,
+    borderColor: "#FFD700",
+  },
+  popularBadge: {
+    position: "absolute",
+    top: -10,
+    right: 10,
+    backgroundColor: "#FFD700",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  popularText: {
+    color: "#000",
+    fontSize: 11,
+    fontWeight: "800",
   },
   priceTitle: {
     color: "white",
@@ -270,6 +303,11 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 24,
     fontWeight: "bold",
+  },
+  priceSubtext: {
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: 14,
+    marginTop: 4,
   },
   loadingContainer: {
     padding: 40,

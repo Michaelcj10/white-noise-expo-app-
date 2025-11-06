@@ -1,0 +1,211 @@
+import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useRevenueCat } from "../contexts/revenuecat";
+import { useTheme } from "../contexts/themecontext";
+
+interface PaywallModalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+export function PaywallModal({ visible, onClose }: PaywallModalProps) {
+  const { theme } = useTheme();
+  const { isPro, offerings, restorePurchases } = useRevenueCat();
+
+  const handleRestore = async () => {
+    const result = await restorePurchases();
+    if (result.success) {
+      onClose();
+    }
+  };
+
+  // Don't show paywall if already pro
+  if (isPro) {
+    return null;
+  }
+
+  // Don't show if no offerings available yet
+  if (!offerings) {
+    return null;
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={false}
+      onRequestClose={onClose}
+    >
+      <View style={styles.container}>
+        {/* Close button */}
+        <View style={styles.headerBar}>
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: theme.border }]}
+            onPress={onClose}
+          >
+            <Ionicons name="close" size={24} color={theme.text} />
+          </TouchableOpacity>
+        </View>
+
+        {/* RevenueCat Paywall UI */}
+        <PaywallView
+          options={{
+            offering: offerings,
+          }}
+          onPurchaseCompleted={({ customerInfo }) => {
+            console.log("✅ Purchase completed!");
+            Alert.alert(
+              "Welcome to Slumbr Pro!",
+              "You now have access to all premium sounds and features."
+            );
+            onClose();
+          }}
+          onPurchaseError={({ error }) => {
+            console.error("❌ Purchase error:", error);
+            if (!error.userCancelled) {
+              Alert.alert(
+                "Purchase Failed",
+                error.message ||
+                  "Unable to complete purchase. Please try again."
+              );
+            }
+          }}
+          onRestoreCompleted={({ customerInfo }) => {
+            console.log("✅ Restore completed!");
+            onClose();
+          }}
+          onRestoreError={({ error }) => {
+            console.error("❌ Restore error:", error);
+          }}
+          onDismiss={() => {
+            console.log("ℹ️ Paywall dismissed");
+            onClose();
+          }}
+        />
+
+        {/* Custom restore button at bottom */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.restoreButton}
+            onPress={handleRestore}
+          >
+            <Text style={[styles.restoreText, { color: theme.primary }]}>
+              Restore Purchases
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  content: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingTop: 16,
+    maxHeight: "90%",
+    borderTopWidth: 1,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "flex-end",
+    marginBottom: 8,
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  badge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(139, 92, 246, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: "center",
+  },
+  features: {
+    marginBottom: 32,
+  },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  featureIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(139, 92, 246, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  featureText: {
+    fontSize: 16,
+    flex: 1,
+  },
+  pricing: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  priceButton: {
+    padding: 20,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  priceTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  priceAmount: {
+    color: "white",
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
+  restoreButton: {
+    padding: 16,
+    alignItems: "center",
+  },
+  restoreText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  terms: {
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+});

@@ -49,8 +49,8 @@ export const themes = {
 
   light: {
     // Core backgrounds - clean whites
-    background: "#ffffff",
-    surface: "#f8fafc",
+    background: "#fff",
+    surface: "#fff",
     card: "#ffffff",
 
     // Borders and dividers

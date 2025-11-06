@@ -31,7 +31,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useBackgroundPlay } from "../../contexts/backgroundplay";
 import { useTheme } from "../../contexts/themecontext";
 
@@ -74,21 +73,22 @@ const DownloadedSounds = {
 
 /* ---------- Sound Source Helper ---------- */
 const SoundCache = {
-  async getSource(soundItem: any, onFirstLoad?: () => void) {
+  getSource(soundItem: any, onFirstLoad?: () => void) {
     // For local sounds, return the required asset directly
     if (soundItem.isLocal) {
       return soundItem.source;
     }
 
-    // For remote sounds, mark as downloaded after first successful load
+    // For remote sounds, mark as downloaded after first successful load (non-blocking)
     if (!DownloadedSounds.isDownloaded(soundItem.id)) {
-      // Simulate download completion and trigger callback
+      // Mark as downloaded in background without blocking
       setTimeout(() => {
         DownloadedSounds.markAsDownloaded(soundItem.id);
         onFirstLoad?.();
-      }, 2000);
+      }, 100);
     }
 
+    // Return immediately without waiting
     return { uri: soundItem.source };
   },
 
@@ -1257,10 +1257,11 @@ export default function SoundsScreen() {
     } else {
       // Add sound
       try {
-        await configureAudioSession();
+        // Configure audio session non-blocking
+        configureAudioSession();
 
-        // Get source with download callback
-        const source = await SoundCache.getSource(soundItem, () => {
+        // Get source with download callback (instant, non-blocking)
+        const source = SoundCache.getSource(soundItem, () => {
           // Mark as downloaded and show toast
           setDownloadedSounds((prev) => {
             const newSet = new Set(prev);
@@ -1270,11 +1271,17 @@ export default function SoundsScreen() {
           showSnackbar(`${soundItem.name} saved for offline`);
         });
 
-        const { sound: newSound } = await Audio.Sound.createAsync(source, {
-          isLooping: true,
-          volume: globalMuted ? 0 : 0.5,
-          shouldPlay: isPlaying,
-        });
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          source,
+          {
+            isLooping: true,
+            volume: globalMuted ? 0 : 0.5,
+            shouldPlay: isPlaying,
+            progressUpdateIntervalMillis: 500,
+          },
+          null,
+          false // Don't download entire file before playing
+        );
 
         newActiveSounds.set(soundItem.id, {
           sound: newSound,
@@ -1345,10 +1352,11 @@ export default function SoundsScreen() {
 
   const playSingleSound = async (soundItem: any) => {
     try {
-      await configureAudioSession();
+      // Configure audio session non-blocking
+      configureAudioSession();
 
-      // Get source with download callback
-      const source = await SoundCache.getSource(soundItem, () => {
+      // Get source with download callback (instant, non-blocking)
+      const source = SoundCache.getSource(soundItem, () => {
         // Mark as downloaded and show toast
         setDownloadedSounds((prev) => {
           const newSet = new Set(prev);
@@ -1358,11 +1366,17 @@ export default function SoundsScreen() {
         showSnackbar(`${soundItem.name} saved for offline`);
       });
 
-      const { sound: newSound } = await Audio.Sound.createAsync(source, {
-        isLooping: true,
-        volume: globalMuted ? 0 : 0.5,
-        shouldPlay: true,
-      });
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        source,
+        {
+          isLooping: true,
+          volume: globalMuted ? 0 : 0.5,
+          shouldPlay: true,
+          progressUpdateIntervalMillis: 500,
+        },
+        null,
+        false // Don't download entire file before playing
+      );
 
       newSound.setOnPlaybackStatusUpdate((status) => {
         if ((status as any).isLoaded) {
@@ -1586,9 +1600,7 @@ export default function SoundsScreen() {
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar
         barStyle={themeMode === "dark" ? "light-content" : "dark-content"}
         backgroundColor={theme.background}
@@ -1843,7 +1855,7 @@ export default function SoundsScreen() {
         <Animated.View
           style={{
             position: "absolute",
-            top: 60,
+            top: 120,
             left: 20,
             right: 20,
             backgroundColor: theme.text,
@@ -1876,7 +1888,7 @@ export default function SoundsScreen() {
         visible={paywallOpen}
         onClose={() => setPaywallOpen(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

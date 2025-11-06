@@ -452,6 +452,72 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         )}
 
+        {pro && (
+          <View
+            style={{
+              marginTop: 16,
+              marginHorizontal: 16,
+              padding: 16,
+              backgroundColor: theme.card,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: "#8b5cf6",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={24} color="#8b5cf6" />
+              <Text
+                style={{
+                  color: theme.text,
+                  fontSize: 18,
+                  fontWeight: "700",
+                  marginLeft: 8,
+                }}
+              >
+                Slumbr Pro Active
+              </Text>
+            </View>
+            <Text
+              style={{
+                color: theme.textSecondary,
+                fontSize: 14,
+                marginBottom: 12,
+              }}
+            >
+              You have access to all premium sounds and features.
+            </Text>
+            <TouchableOpacity
+              onPress={() => setPaywallOpen(true)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: theme.border,
+                padding: 12,
+                borderRadius: 8,
+              }}
+            >
+              <Ionicons name="settings-outline" size={18} color={theme.text} />
+              <Text
+                style={{
+                  color: theme.text,
+                  fontSize: 14,
+                  fontWeight: "600",
+                  marginLeft: 8,
+                }}
+              >
+                Manage Subscription
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={styles.footer}>
           <Image
             style={styles.footerLogo}
