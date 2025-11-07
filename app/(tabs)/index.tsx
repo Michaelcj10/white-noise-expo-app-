@@ -1,4 +1,5 @@
 import { PaywallModal } from "@/components/PaywallModal";
+import { SoundCardSkeleton } from "@/components/ShimmerLoader";
 import {
   CATEGORY_COLORS,
   SOUND_CATEGORIES,
@@ -828,6 +829,83 @@ function TimerModal({
   );
 }
 
+/* ================== EMPTY STATE ================== */
+function EmptyPlayerState({ theme }: { theme: any }) {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingVertical: 60,
+        paddingHorizontal: 32,
+      }}
+    >
+      <Animated.View
+        style={{
+          transform: [{ scale: pulseAnim }],
+          marginBottom: 24,
+        }}
+      >
+        <View
+          style={{
+            width: 100,
+            height: 100,
+            borderRadius: 50,
+            backgroundColor: theme.primary + "20",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Ionicons name="musical-notes" size={48} color={theme.primary} />
+        </View>
+      </Animated.View>
+      <Text
+        style={{
+          fontSize: 24,
+          fontWeight: "700",
+          color: theme.text,
+          marginBottom: 12,
+          textAlign: "center",
+        }}
+      >
+        No Sounds Playing
+      </Text>
+      <Text
+        style={{
+          fontSize: 16,
+          color: theme.textSecondary,
+          textAlign: "center",
+          lineHeight: 24,
+        }}
+      >
+        Tap on any sound below to start your relaxing experience
+      </Text>
+    </View>
+  );
+}
+
 /* ================== SOUND VISUALIZER ================== */
 function SoundVisualizer({
   isPlaying,
@@ -945,10 +1023,15 @@ export default function SoundsScreen() {
     SoundCategory | "Favourites"
   >(SOUND_CATEGORIES.ALL);
 
+  // Animation for category tab indicator
+  const tabIndicatorPosition = useRef(new Animated.Value(0)).current;
+  const tabIndicatorWidth = useRef(new Animated.Value(100)).current;
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [globalMuted, setGlobalMuted] = useState(false);
   const [loadingSounds, setLoadingSounds] = useState<Set<number>>(new Set());
   const [selectedSounds, setSelectedSounds] = useState<Set<number>>(new Set());
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Timer state
   const [timerMinutes, setTimerMinutes] = useState<number | null>(null);
@@ -971,9 +1054,16 @@ export default function SoundsScreen() {
     new Set([0, 1, 2])
   );
 
-  // Snackbar state for favorites and download feedback
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const snackbarOpacity = useRef(new Animated.Value(0)).current;
+  // Snackbar state for favorites and download feedback - supports multiple toasts
+  const [snackbars, setSnackbars] = useState<
+    {
+      id: number;
+      message: string;
+      opacity: Animated.Value;
+      translateY: Animated.Value;
+    }[]
+  >([]);
+  const snackbarIdCounter = useRef(0);
 
   const playerSlide = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -1214,6 +1304,9 @@ export default function SoundsScreen() {
         }
       } catch (error) {
         console.error("Error loading favorites:", error);
+      } finally {
+        // Turn off initial loading after a brief delay to show skeleton
+        setTimeout(() => setIsInitialLoad(false), 800);
       }
     };
     loadFavorites();
@@ -1278,26 +1371,55 @@ export default function SoundsScreen() {
     saveFavorites(newFavorites);
   };
 
-  // Show snackbar animation
-  const showSnackbar = useCallback(
-    (message: string) => {
-      setSnackbarMessage(message);
-      Animated.sequence([
-        Animated.timing(snackbarOpacity, {
-          toValue: 1,
+  // Show snackbar animation with stacking support
+  const showSnackbar = useCallback((message: string) => {
+    const id = snackbarIdCounter.current++;
+    const opacity = new Animated.Value(0);
+    const translateY = new Animated.Value(0);
+
+    // Add new snackbar to the stack
+    setSnackbars((prev) => {
+      // Animate existing snackbars down to make room
+      prev.forEach((snackbar, index) => {
+        Animated.timing(snackbar.translateY, {
+          toValue: (index + 1) * 70,
           duration: 300,
           useNativeDriver: true,
-        }),
-        Animated.delay(2000),
-        Animated.timing(snackbarOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start(() => setSnackbarMessage(""));
-    },
-    [snackbarOpacity]
-  );
+        }).start();
+      });
+
+      return [...prev, { id, message, opacity, translateY }];
+    });
+
+    // Animate in
+    Animated.sequence([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.delay(2500),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Remove snackbar and animate remaining ones up
+      setSnackbars((prev) => {
+        const filtered = prev.filter((s) => s.id !== id);
+        // Animate remaining snackbars to their new positions
+        filtered.forEach((snackbar, index) => {
+          Animated.timing(snackbar.translateY, {
+            toValue: index * 70,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        });
+        return filtered;
+      });
+    });
+  }, []);
 
   // Toggle sound in mixer
   const toggleSoundInMixer = async (soundItem: any) => {
@@ -1756,14 +1878,93 @@ export default function SoundsScreen() {
     const isLoading = loadingSounds.has(soundItem.id);
     const isSelected = selectedSounds.has(soundItem.id);
 
+    // Animation values
+    const cardScale = useRef(new Animated.Value(1)).current;
+    const heartScale = useRef(new Animated.Value(1)).current;
+    const iconPulse = useRef(new Animated.Value(1)).current;
+
+    // Animate when sound becomes active/inactive
+    useEffect(() => {
+      if (isActive || isQuickPlayActive) {
+        // Start pulsing animation for icon
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(iconPulse, {
+              toValue: 1.15,
+              duration: 800,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(iconPulse, {
+              toValue: 1,
+              duration: 800,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ])
+        ).start();
+      } else {
+        // Stop pulsing
+        iconPulse.stopAnimation();
+        Animated.timing(iconPulse, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    }, [isActive, isQuickPlayActive, iconPulse]);
+
     const handlePress = () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      // Animate card press
+      Animated.sequence([
+        Animated.timing(cardScale, {
+          toValue: 0.97,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.spring(cardScale, {
+          toValue: 1,
+          friction: 3,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
       // Gate playback
       tryPlaySingle(soundItem);
     };
 
+    const handleHeartPress = (e: any) => {
+      e.stopPropagation();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      // Animate heart with spring
+      Animated.sequence([
+        Animated.spring(heartScale, {
+          toValue: 1.3,
+          friction: 3,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+        Animated.spring(heartScale, {
+          toValue: 1,
+          friction: 3,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      toggleFavorite(soundItem.id);
+    };
+
     return (
-      <View>
+      <Animated.View
+        style={{
+          transform: [{ scale: cardScale }],
+        }}
+      >
         <TouchableOpacity
           style={[
             styles.soundCard,
@@ -1777,15 +1978,44 @@ export default function SoundsScreen() {
           activeOpacity={0.8}
           disabled={isLoading}
         >
-          <View
-            style={[styles.iconContainer, { backgroundColor: soundItem.color }]}
+          <Animated.View
+            style={[
+              styles.iconContainer,
+              {
+                backgroundColor: soundItem.color,
+                transform: [{ scale: iconPulse }],
+              },
+            ]}
           >
             {isLoading ? (
-              <ActivityIndicator size="small" color="white" />
+              <View style={{ position: "relative" }}>
+                <ActivityIndicator size="small" color="white" />
+                <View
+                  style={{
+                    position: "absolute",
+                    bottom: -2,
+                    right: -2,
+                    backgroundColor: soundItem.color,
+                    borderRadius: 8,
+                    paddingHorizontal: 4,
+                    paddingVertical: 1,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "white",
+                      fontSize: 8,
+                      fontWeight: "600",
+                    }}
+                  >
+                    ...
+                  </Text>
+                </View>
+              </View>
             ) : (
               <Ionicons name={soundItem.icon} size={24} color="white" />
             )}
-          </View>
+          </Animated.View>
 
           <View style={styles.soundInfo}>
             <Text style={[styles.soundName, { color: theme.text }]}>
@@ -1854,31 +2084,29 @@ export default function SoundsScreen() {
               </View>
             ) : (
               <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation();
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  toggleFavorite(soundItem.id);
-                }}
+                onPress={handleHeartPress}
                 style={{
                   padding: 8,
                 }}
               >
-                <Ionicons
-                  name={
-                    favorites?.has(soundItem.id) ? "heart" : "heart-outline"
-                  }
-                  size={22}
-                  color={
-                    favorites?.has(soundItem.id)
-                      ? "#FF6B6B"
-                      : theme.textSecondary
-                  }
-                />
+                <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                  <Ionicons
+                    name={
+                      favorites?.has(soundItem.id) ? "heart" : "heart-outline"
+                    }
+                    size={22}
+                    color={
+                      favorites?.has(soundItem.id)
+                        ? "#FF6B6B"
+                        : theme.textSecondary
+                    }
+                  />
+                </Animated.View>
               </TouchableOpacity>
             )}
           </View>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     );
   }
 
@@ -1956,11 +2184,25 @@ export default function SoundsScreen() {
                 {
                   color:
                     selectedCategory === "Favourites" ? "white" : theme.text,
+                  fontWeight: selectedCategory === "Favourites" ? "700" : "600",
                 },
               ]}
             >
               Favourites
             </Text>
+            {selectedCategory === "Favourites" && (
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: -2,
+                  left: 8,
+                  right: 8,
+                  height: 3,
+                  backgroundColor: "white",
+                  borderRadius: 2,
+                }}
+              />
+            )}
           </TouchableOpacity>
         )}
         {Object.values(SOUND_CATEGORIES).map((category) => (
@@ -1986,11 +2228,25 @@ export default function SoundsScreen() {
                 styles.categoryTabText,
                 {
                   color: selectedCategory === category ? "white" : theme.text,
+                  fontWeight: selectedCategory === category ? "700" : "600",
                 },
               ]}
             >
               {category}
             </Text>
+            {selectedCategory === category && (
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: -2,
+                  left: 8,
+                  right: 8,
+                  height: 3,
+                  backgroundColor: "white",
+                  borderRadius: 2,
+                }}
+              />
+            )}
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -2002,32 +2258,61 @@ export default function SoundsScreen() {
             setScrollViewRef("index", ref);
           }}
         >
-          {WHITE_NOISE_SOUNDS.filter((sound) => {
-            // Handle Favourites category
-            if (selectedCategory === "Favourites") {
-              return favorites?.has(sound.id) || false;
-            }
-            // Handle regular categories
-            return (
-              selectedCategory === SOUND_CATEGORIES.ALL ||
-              sound.category === selectedCategory
-            );
-          })
-            .sort((a, b) => {
-              // Free sounds first, then premium
-              if (a.premium !== b.premium) {
-                return a.premium ? 1 : -1;
-              }
-              // Then alphabetically
-              return a.name.localeCompare(b.name);
-            })
-            .map((soundItem, index) => (
-              <SoundCard
-                key={soundItem.id}
-                soundItem={soundItem}
-                index={index}
-              />
-            ))}
+          {isInitialLoad ? (
+            // Show skeleton loaders during initial load
+            <>
+              <SoundCardSkeleton />
+              <SoundCardSkeleton />
+              <SoundCardSkeleton />
+              <SoundCardSkeleton />
+              <SoundCardSkeleton />
+              <SoundCardSkeleton />
+            </>
+          ) : (
+            <>
+              {WHITE_NOISE_SOUNDS.filter((sound) => {
+                // Handle Favourites category
+                if (selectedCategory === "Favourites") {
+                  return favorites?.has(sound.id) || false;
+                }
+                // Handle regular categories
+                return (
+                  selectedCategory === SOUND_CATEGORIES.ALL ||
+                  sound.category === selectedCategory
+                );
+              }).length === 0 ? (
+                // Show empty state when no sounds match the filter
+                <EmptyPlayerState theme={theme} />
+              ) : (
+                WHITE_NOISE_SOUNDS.filter((sound) => {
+                  // Handle Favourites category
+                  if (selectedCategory === "Favourites") {
+                    return favorites?.has(sound.id) || false;
+                  }
+                  // Handle regular categories
+                  return (
+                    selectedCategory === SOUND_CATEGORIES.ALL ||
+                    sound.category === selectedCategory
+                  );
+                })
+                  .sort((a, b) => {
+                    // Free sounds first, then premium
+                    if (a.premium !== b.premium) {
+                      return a.premium ? 1 : -1;
+                    }
+                    // Then alphabetically
+                    return a.name.localeCompare(b.name);
+                  })
+                  .map((soundItem, index) => (
+                    <SoundCard
+                      key={soundItem.id}
+                      soundItem={soundItem}
+                      index={index}
+                    />
+                  ))
+              )}
+            </>
+          )}
           <View style={{ height: 100 }} />
         </ScrollView>
       </View>
@@ -2156,38 +2441,40 @@ export default function SoundsScreen() {
         currentTimer={timerMinutes}
       />
 
-      {/* Snackbar for favorites feedback */}
-      {snackbarMessage !== "" && (
+      {/* Snackbar for favorites feedback - now with stacking and smooth transitions */}
+      {snackbars.map((snackbar, index) => (
         <Animated.View
+          key={snackbar.id}
           style={{
             position: "absolute",
             top: 120,
             left: 20,
             right: 20,
-            backgroundColor: theme.text,
+            backgroundColor: theme.primary,
             padding: 16,
             borderRadius: 12,
-            opacity: snackbarOpacity,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 3.84,
-            elevation: 5,
-            zIndex: 9999,
+            opacity: snackbar.opacity,
+            shadowColor: theme.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
+            zIndex: 9999 - index,
+            transform: [{ translateY: snackbar.translateY }],
           }}
         >
           <Text
             style={{
-              color: theme.background,
+              color: "#FFFFFF",
               fontSize: 14,
-              fontWeight: "600",
+              fontWeight: "700",
               textAlign: "center",
             }}
           >
-            {snackbarMessage}
+            {snackbar.message}
           </Text>
         </Animated.View>
-      )}
+      ))}
 
       {/* Paywall Modal */}
       <PaywallModal
