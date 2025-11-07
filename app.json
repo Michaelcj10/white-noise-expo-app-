@@ -22,7 +22,7 @@
       "package": "com.slumbr.whitenoiseapp",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/app-icon-android.png",
+        "foregroundImage": "./assets/images/app-icon.png",
         "backgroundColor": "#0A0903"
       },
       "edgeToEdgeEnabled": true,

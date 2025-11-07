@@ -17,6 +17,7 @@ import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   AppState,
@@ -946,6 +947,8 @@ export default function SoundsScreen() {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [globalMuted, setGlobalMuted] = useState(false);
+  const [loadingSounds, setLoadingSounds] = useState<Set<number>>(new Set());
+  const [selectedSounds, setSelectedSounds] = useState<Set<number>>(new Set());
 
   // Timer state
   const [timerMinutes, setTimerMinutes] = useState<number | null>(null);
@@ -1167,7 +1170,7 @@ export default function SoundsScreen() {
   }, [activeSounds, isPlaying]);
 
   useEffect(() => {
-    if (activeSounds.size > 0) {
+    if (activeSounds.size > 0 || selectedSounds.size > 0) {
       Animated.parallel([
         Animated.spring(playerSlide, {
           toValue: 0,
@@ -1198,7 +1201,7 @@ export default function SoundsScreen() {
         }),
       ]).start();
     }
-  }, [activeSounds.size, playerSlide, overlayOpacity]);
+  }, [activeSounds.size, selectedSounds.size, playerSlide, overlayOpacity]);
 
   // Load favorites from storage
   useEffect(() => {
@@ -1308,9 +1311,22 @@ export default function SoundsScreen() {
         await data.sound.unloadAsync();
       }
       newActiveSounds.delete(soundItem.id);
+
+      // Remove from selected sounds too
+      setSelectedSounds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(soundItem.id);
+        return newSet;
+      });
     } else {
       // Add sound
       try {
+        // Immediately mark as selected for border feedback
+        setSelectedSounds((prev) => new Set(prev).add(soundItem.id));
+
+        // Show loading state
+        setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
+
         // Configure audio session non-blocking
         configureAudioSession();
 
@@ -1332,8 +1348,23 @@ export default function SoundsScreen() {
             volume: globalMuted ? 0 : 0.5,
             shouldPlay: isPlaying,
             progressUpdateIntervalMillis: 500,
+            // Optimize for faster initial playback
+            androidImplementation: "MediaPlayer",
           },
-          null,
+          (status) => {
+            // Remove loading state once sound can play
+            if (
+              status.isLoaded &&
+              status.durationMillis &&
+              status.durationMillis > 0
+            ) {
+              setLoadingSounds((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(soundItem.id);
+                return newSet;
+              });
+            }
+          },
           false // Don't download entire file before playing
         );
 
@@ -1344,7 +1375,26 @@ export default function SoundsScreen() {
           isMuted: globalMuted,
           id: 0,
         });
+
+        // Clear selectedSounds since it's now active
+        setSelectedSounds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(soundItem.id);
+          return newSet;
+        });
       } catch (error) {
+        // Clear loading and selected state on error
+        setLoadingSounds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(soundItem.id);
+          return newSet;
+        });
+        setSelectedSounds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(soundItem.id);
+          return newSet;
+        });
+
         Alert.alert(
           "Error",
           "Could not load sound. Please check your internet connection."
@@ -1399,6 +1449,9 @@ export default function SoundsScreen() {
       return;
     }
 
+    // Immediately mark sound as selected to show border
+    setSelectedSounds(new Set([soundItem.id]));
+
     // Stop all other sounds and play just this one
     await stopAllSounds();
     await playSingleSound(soundItem);
@@ -1407,6 +1460,9 @@ export default function SoundsScreen() {
   const playSingleSound = useCallback(
     async (soundItem: any) => {
       try {
+        // Show loading state
+        setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
+
         // Configure audio session non-blocking
         configureAudioSession();
 
@@ -1428,8 +1484,23 @@ export default function SoundsScreen() {
             volume: globalMuted ? 0 : 0.5,
             shouldPlay: true,
             progressUpdateIntervalMillis: 500,
+            // Optimize for faster initial playback
+            androidImplementation: "MediaPlayer",
           },
-          null,
+          (status) => {
+            // Remove loading state once sound can play
+            if (
+              status.isLoaded &&
+              status.durationMillis &&
+              status.durationMillis > 0
+            ) {
+              setLoadingSounds((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(soundItem.id);
+                return newSet;
+              });
+            }
+          },
           false // Don't download entire file before playing
         );
 
@@ -1459,9 +1530,20 @@ export default function SoundsScreen() {
         setActiveSounds(newActiveSounds);
         setIsPlaying(true);
 
+        // Clear selectedSounds since it's now active
+        setSelectedSounds(new Set());
+
         // Show notification for background playback (not paused)
         await showPlayingNotification(soundItem.name, false);
       } catch (error) {
+        // Clear loading and selected state on error
+        setLoadingSounds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(soundItem.id);
+          return newSet;
+        });
+        setSelectedSounds(new Set());
+
         Alert.alert("Error", "Could not play sound. Please try again later.");
         console.error("Error playing sound:", error);
       }
@@ -1671,6 +1753,8 @@ export default function SoundsScreen() {
     const isActive = activeSounds.has(soundItem.id);
     const isQuickPlayActive =
       isQuickPlaying && favoriteSoundId === String(soundItem.id);
+    const isLoading = loadingSounds.has(soundItem.id);
+    const isSelected = selectedSounds.has(soundItem.id);
 
     const handlePress = () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1684,18 +1768,23 @@ export default function SoundsScreen() {
           style={[
             styles.soundCard,
             { backgroundColor: theme.surface, borderColor: theme.border },
-            (isActive || isQuickPlayActive) && {
+            (isActive || isQuickPlayActive || isSelected) && {
               borderColor: theme.primary,
               backgroundColor: theme.card,
             },
           ]}
           onPress={handlePress}
           activeOpacity={0.8}
+          disabled={isLoading}
         >
           <View
             style={[styles.iconContainer, { backgroundColor: soundItem.color }]}
           >
-            <Ionicons name={soundItem.icon} size={24} color="white" />
+            {isLoading ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Ionicons name={soundItem.icon} size={24} color="white" />
+            )}
           </View>
 
           <View style={styles.soundInfo}>
@@ -1918,7 +2007,7 @@ export default function SoundsScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
       </View>
-      {activeSounds.size > 0 && (
+      {(activeSounds.size > 0 || selectedSounds.size > 0) && (
         <>
           <Animated.View
             style={[
@@ -1987,8 +2076,26 @@ export default function SoundsScreen() {
                 iconColor={timerMinutes ? "white" : theme.text}
               />
               <AnimatedControlButton
-                onPress={isPlaying ? pauseAllSounds : resumeAllSounds}
-                iconName={isPlaying ? "pause" : "play"}
+                onPress={
+                  selectedSounds.size > 0 && activeSounds.size === 0
+                    ? undefined // Disable when loading
+                    : isPlaying
+                    ? pauseAllSounds
+                    : resumeAllSounds
+                }
+                iconName={
+                  selectedSounds.size > 0 && activeSounds.size === 0
+                    ? "hourglass" // Show loading icon when sounds are selected but not active
+                    : isPlaying
+                    ? "pause"
+                    : "play"
+                }
+                style={{
+                  opacity:
+                    selectedSounds.size > 0 && activeSounds.size === 0
+                      ? 0.6
+                      : 1,
+                }}
               />
               <AnimatedControlButton
                 onPress={stopAllSounds}
