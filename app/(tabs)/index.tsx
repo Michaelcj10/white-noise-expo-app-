@@ -34,6 +34,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBackgroundPlay } from "../../contexts/backgroundplay";
 import { useTheme } from "../../contexts/themecontext";
+import {
+  hidePlayingNotification,
+  setupAudioNotifications,
+  showPlayingNotification,
+} from "../../utils/audioNotification";
 
 /* ---------- Platform helpers ---------- */
 const isWeb = Platform.OS === "web";
@@ -650,6 +655,26 @@ function TimerModal({
   theme: any;
   currentTimer: number | null;
 }) {
+  const [isVisible, setIsVisible] = React.useState(visible);
+
+  React.useEffect(() => {
+    if (visible) {
+      setIsVisible(true);
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    setIsVisible(false);
+    setTimeout(() => {
+      onClose();
+    }, 300); // Wait for slide animation
+  };
+
+  const handleSelectTimer = (value: number | null) => {
+    onSetTimer(value);
+    handleClose();
+  };
+
   const timerOptions = [
     { label: "No Timer", value: null },
     { label: "5 minutes", value: 5 },
@@ -664,10 +689,10 @@ function TimerModal({
 
   return (
     <Modal
-      visible={visible}
+      visible={isVisible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View
         style={{
@@ -732,10 +757,7 @@ function TimerModal({
             {timerOptions.map((option, index) => (
               <TouchableOpacity
                 key={index}
-                onPress={() => {
-                  onSetTimer(option.value);
-                  onClose();
-                }}
+                onPress={() => handleSelectTimer(option.value)}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
@@ -786,7 +808,7 @@ function TimerModal({
           </ScrollView>
 
           <TouchableOpacity
-            onPress={onClose}
+            onPress={handleClose}
             style={{
               padding: 12,
               alignItems: "center",
@@ -970,6 +992,9 @@ export default function SoundsScreen() {
 
   useEffect(() => {
     configureAudioSession();
+
+    // Setup notifications for background playback
+    setupAudioNotifications();
   }, [backgroundPlayEnabled]);
 
   // Handle app state changes (safe on web)
@@ -1396,6 +1421,9 @@ export default function SoundsScreen() {
 
       setActiveSounds(newActiveSounds);
       setIsPlaying(true);
+
+      // Show notification for background playback
+      await showPlayingNotification(soundItem.name);
     } catch (error) {
       Alert.alert("Error", "Could not play sound. Please try again later.");
       console.error("Error playing sound:", error);
@@ -1407,6 +1435,9 @@ export default function SoundsScreen() {
       await data.sound.pauseAsync();
     }
     setIsPlaying(false);
+
+    // Hide notification when paused
+    await hidePlayingNotification();
   };
 
   const resumeAllSounds = async () => {
@@ -1415,6 +1446,14 @@ export default function SoundsScreen() {
         await data.sound.playAsync();
       }
       setIsPlaying(true);
+
+      // Show notification again when resumed
+      if (activeSounds.size > 0) {
+        const firstSound = Array.from(activeSounds.values())[0];
+        if (firstSound?.soundItem?.name) {
+          await showPlayingNotification(firstSound.soundItem.name);
+        }
+      }
     } catch (error) {
       Alert.alert("Error", "Could not resume sounds.");
       console.error("Error resuming sounds:", error);
@@ -1445,6 +1484,9 @@ export default function SoundsScreen() {
       setTimerMinutes(null);
       setTimerSeconds(0);
       setGlobalMuted(false);
+
+      // Hide notification when stopped
+      await hidePlayingNotification();
     } catch (error) {
       Alert.alert("Error", "Could not stop sounds.");
       console.error("Error stopping sounds:", error);
