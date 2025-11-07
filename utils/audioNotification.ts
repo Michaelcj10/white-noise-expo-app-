@@ -2,6 +2,14 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
+// Action identifiers
+export const NOTIFICATION_ACTIONS = {
+  PAUSE: "pause",
+  PLAY: "play",
+  STOP: "stop",
+  NEXT: "next",
+};
+
 // Configure notification behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -14,6 +22,59 @@ Notifications.setNotificationHandler({
 });
 
 let currentNotificationId: string | null = null;
+
+// Setup notification categories with actions (buttons)
+const setupNotificationCategories = async () => {
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationCategoryAsync("playback", [
+      {
+        identifier: NOTIFICATION_ACTIONS.PAUSE,
+        buttonTitle: "Pause",
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+      {
+        identifier: NOTIFICATION_ACTIONS.NEXT,
+        buttonTitle: "Next",
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+      {
+        identifier: NOTIFICATION_ACTIONS.STOP,
+        buttonTitle: "Stop",
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+    ]);
+
+    await Notifications.setNotificationCategoryAsync("playback-paused", [
+      {
+        identifier: NOTIFICATION_ACTIONS.PLAY,
+        buttonTitle: "Play",
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+      {
+        identifier: NOTIFICATION_ACTIONS.NEXT,
+        buttonTitle: "Next",
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+      {
+        identifier: NOTIFICATION_ACTIONS.STOP,
+        buttonTitle: "Stop",
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+    ]);
+  }
+};
 
 export const setupAudioNotifications = async () => {
   // Request permission for notifications (required for Android)
@@ -32,42 +93,61 @@ export const setupAudioNotifications = async () => {
       vibrationPattern: null,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       bypassDnd: false,
+      enableLights: false,
+      enableVibrate: false,
     });
   }
+
+  // Setup notification categories with action buttons
+  await setupNotificationCategories();
 
   return true;
 };
 
-export const showPlayingNotification = async (soundName: string) => {
+export const showPlayingNotification = async (
+  soundName: string,
+  isPaused: boolean = false
+) => {
   try {
     // Cancel existing notification if any
     if (currentNotificationId) {
       await Notifications.dismissNotificationAsync(currentNotificationId);
     }
 
-    // Show new persistent notification
+    // Show new persistent notification with controls
     currentNotificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: "White Noise - Now Playing",
+        title: isPaused ? "White Noise - Paused" : "White Noise - Now Playing",
         body: `${soundName}`,
-        sound: undefined, // No sound
+        sound: undefined,
         priority: Notifications.AndroidNotificationPriority.LOW,
-        sticky: true, // Makes it persistent
+        sticky: true,
         badge: 0,
-        data: { type: "audio-playback" },
+        categoryIdentifier: isPaused ? "playback-paused" : "playback",
+        data: {
+          type: "audio-playback",
+          soundName,
+          isPaused,
+        },
       },
-      trigger: null, // Show immediately
+      trigger: null,
     });
 
-    console.log("📢 Notification shown for:", soundName);
+    console.log(
+      "📢 Notification shown for:",
+      soundName,
+      isPaused ? "(Paused)" : ""
+    );
   } catch (error) {
     console.error("Error showing notification:", error);
   }
 };
 
-export const updatePlayingNotification = async (soundName: string) => {
-  // Same as show, updates existing notification
-  await showPlayingNotification(soundName);
+export const updatePlayingNotification = async (
+  soundName: string,
+  isPaused: boolean = false
+) => {
+  await showPlayingNotification(soundName, isPaused);
 };
 
 export const hidePlayingNotification = async () => {

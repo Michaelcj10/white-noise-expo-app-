@@ -13,6 +13,7 @@ import { useQuickPlay } from "@/contexts/quickplay";
 import { useRevenueCat } from "@/contexts/revenuecat";
 import { useScroll } from "@/contexts/scroll";
 import { useFocusEffect } from "@react-navigation/native";
+import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -36,6 +37,7 @@ import { useBackgroundPlay } from "../../contexts/backgroundplay";
 import { useTheme } from "../../contexts/themecontext";
 import {
   hidePlayingNotification,
+  NOTIFICATION_ACTIONS,
   setupAudioNotifications,
   showPlayingNotification,
 } from "../../utils/audioNotification";
@@ -990,11 +992,29 @@ export default function SoundsScreen() {
     });
   };
 
+  const configureAudioSession = useCallback(async () => {
+    try {
+      // On web, setAudioModeAsync is a no-op; guard just in case
+      if (Audio?.setAudioModeAsync) {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          staysActiveInBackground: backgroundPlayEnabled && !isWeb,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+      }
+    } catch (error) {
+      console.error("Error configuring audio session:", error);
+    }
+  }, [backgroundPlayEnabled]);
+
   useEffect(() => {
     configureAudioSession();
 
     // Setup notifications for background playback
     setupAudioNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backgroundPlayEnabled]);
 
   // Handle app state changes (safe on web)
@@ -1054,23 +1074,6 @@ export default function SoundsScreen() {
   useEffect(() => {
     setIsMainPlaying(isPlaying);
   }, [isPlaying, setIsMainPlaying]);
-
-  const configureAudioSession = async () => {
-    try {
-      // On web, setAudioModeAsync is a no-op; guard just in case
-      if (Audio?.setAudioModeAsync) {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          staysActiveInBackground: backgroundPlayEnabled && !isWeb,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        });
-      }
-    } catch (error) {
-      console.error("Error configuring audio session:", error);
-    }
-  };
 
   const updateNowPlayingInfo = async () => {
     try {
@@ -1252,22 +1255,25 @@ export default function SoundsScreen() {
   };
 
   // Show snackbar animation
-  const showSnackbar = (message: string) => {
-    setSnackbarMessage(message);
-    Animated.sequence([
-      Animated.timing(snackbarOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.delay(2000),
-      Animated.timing(snackbarOpacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => setSnackbarMessage(""));
-  };
+  const showSnackbar = useCallback(
+    (message: string) => {
+      setSnackbarMessage(message);
+      Animated.sequence([
+        Animated.timing(snackbarOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.delay(2000),
+        Animated.timing(snackbarOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setSnackbarMessage(""));
+    },
+    [snackbarOpacity]
+  );
 
   // Toggle sound in mixer
   const toggleSoundInMixer = async (soundItem: any) => {
@@ -1377,88 +1383,96 @@ export default function SoundsScreen() {
     await playSingleSound(soundItem);
   };
 
-  const playSingleSound = async (soundItem: any) => {
-    try {
-      // Configure audio session non-blocking
-      configureAudioSession();
+  const playSingleSound = useCallback(
+    async (soundItem: any) => {
+      try {
+        // Configure audio session non-blocking
+        configureAudioSession();
 
-      // Get source with download callback (instant, non-blocking)
-      const source = SoundCache.getSource(soundItem, () => {
-        // Mark as downloaded and show toast
-        setDownloadedSounds((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(soundItem.id);
-          return newSet;
+        // Get source with download callback (instant, non-blocking)
+        const source = SoundCache.getSource(soundItem, () => {
+          // Mark as downloaded and show toast
+          setDownloadedSounds((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(soundItem.id);
+            return newSet;
+          });
+          showSnackbar(`${soundItem.name} saved for offline`);
         });
-        showSnackbar(`${soundItem.name} saved for offline`);
-      });
 
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        source,
-        {
-          isLooping: true,
-          volume: globalMuted ? 0 : 0.5,
-          shouldPlay: true,
-          progressUpdateIntervalMillis: 500,
-        },
-        null,
-        false // Don't download entire file before playing
-      );
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          source,
+          {
+            isLooping: true,
+            volume: globalMuted ? 0 : 0.5,
+            shouldPlay: true,
+            progressUpdateIntervalMillis: 500,
+          },
+          null,
+          false // Don't download entire file before playing
+        );
 
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if ((status as any).isLoaded) {
-          setIsPlaying((status as any).isPlaying);
-        }
-      });
+        newSound.setOnPlaybackStatusUpdate((status) => {
+          if ((status as any).isLoaded) {
+            setIsPlaying((status as any).isPlaying);
+          }
+        });
 
-      const newActiveSounds = new Map();
-      newActiveSounds.set(soundItem.id, {
-        sound: newSound,
-        soundItem,
-        volume: 0.5,
-        isMuted: globalMuted,
-      });
+        const newActiveSounds = new Map();
+        newActiveSounds.set(soundItem.id, {
+          sound: newSound,
+          soundItem,
+          volume: 0.5,
+          isMuted: globalMuted,
+        });
 
-      setActiveSounds(newActiveSounds);
-      setIsPlaying(true);
+        setActiveSounds(newActiveSounds);
+        setIsPlaying(true);
 
-      // Show notification for background playback
-      await showPlayingNotification(soundItem.name);
-    } catch (error) {
-      Alert.alert("Error", "Could not play sound. Please try again later.");
-      console.error("Error playing sound:", error);
-    }
-  };
+        // Show notification for background playback (not paused)
+        await showPlayingNotification(soundItem.name, false);
+      } catch (error) {
+        Alert.alert("Error", "Could not play sound. Please try again later.");
+        console.error("Error playing sound:", error);
+      }
+    },
+    [globalMuted, showSnackbar, configureAudioSession]
+  );
 
-  const pauseAllSounds = async () => {
+  const pauseAllSounds = useCallback(async () => {
     for (const [id, data] of activeSounds.entries()) {
       await data.sound.pauseAsync();
     }
     setIsPlaying(false);
 
-    // Hide notification when paused
-    await hidePlayingNotification();
-  };
+    // Update notification to show paused state
+    if (activeSounds.size > 0) {
+      const firstSound = Array.from(activeSounds.values())[0];
+      if (firstSound?.soundItem?.name) {
+        await showPlayingNotification(firstSound.soundItem.name, true);
+      }
+    }
+  }, [activeSounds]);
 
-  const resumeAllSounds = async () => {
+  const resumeAllSounds = useCallback(async () => {
     try {
       for (const [id, data] of activeSounds.entries()) {
         await data.sound.playAsync();
       }
       setIsPlaying(true);
 
-      // Show notification again when resumed
+      // Update notification to show playing state
       if (activeSounds.size > 0) {
         const firstSound = Array.from(activeSounds.values())[0];
         if (firstSound?.soundItem?.name) {
-          await showPlayingNotification(firstSound.soundItem.name);
+          await showPlayingNotification(firstSound.soundItem.name, false);
         }
       }
     } catch (error) {
       Alert.alert("Error", "Could not resume sounds.");
       console.error("Error resuming sounds:", error);
     }
-  };
+  }, [activeSounds]);
 
   const stopAllSounds = useCallback(async () => {
     try {
@@ -1493,6 +1507,51 @@ export default function SoundsScreen() {
     }
   }, [activeSounds]);
 
+  const playNextFavorite = useCallback(async () => {
+    try {
+      // Get all favorite sounds
+      const favoriteSounds = WHITE_NOISE_SOUNDS.filter((sound) =>
+        favorites.has(sound.id)
+      );
+
+      if (favoriteSounds.length === 0) {
+        console.log("No favorites to play");
+        return;
+      }
+
+      // Get current playing sound
+      const currentSound =
+        activeSounds.size > 0
+          ? Array.from(activeSounds.values())[0]?.soundItem
+          : null;
+
+      // Find next favorite
+      let nextSound;
+      if (currentSound) {
+        const currentIndex = favoriteSounds.findIndex(
+          (s) => s.id === currentSound.id
+        );
+        const nextIndex = (currentIndex + 1) % favoriteSounds.length;
+        nextSound = favoriteSounds[nextIndex];
+      } else {
+        // No current sound, play first favorite
+        nextSound = favoriteSounds[0];
+      }
+
+      // Check if premium
+      if (nextSound.premium && !pro) {
+        console.log("Next sound is premium");
+        return;
+      }
+
+      // Stop current and play next
+      await stopAllSounds();
+      await playSingleSound(nextSound);
+    } catch (error) {
+      console.error("Error playing next favorite:", error);
+    }
+  }, [activeSounds, favorites, pro, stopAllSounds, playSingleSound]);
+
   // Register stopAllSounds callback with context - use ref to avoid re-renders
   const stopAllSoundsRef = useRef(stopAllSounds);
 
@@ -1507,6 +1566,48 @@ export default function SoundsScreen() {
       setStopMainSounds(null);
     };
   }, [setStopMainSounds]);
+
+  // Create refs for notification actions to avoid stale closures
+  const notificationPauseRef = useRef(pauseAllSounds);
+  const notificationResumeRef = useRef(resumeAllSounds);
+  const notificationNextRef = useRef(playNextFavorite);
+
+  // Update refs when functions change
+  useEffect(() => {
+    notificationPauseRef.current = pauseAllSounds;
+    notificationResumeRef.current = resumeAllSounds;
+    notificationNextRef.current = playNextFavorite;
+  }, [pauseAllSounds, resumeAllSounds, playNextFavorite]);
+
+  // Setup notification listener
+  useEffect(() => {
+    // Listen for notification action responses
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const action = response.actionIdentifier;
+        console.log("📢 Notification action:", action);
+
+        switch (action) {
+          case NOTIFICATION_ACTIONS.PAUSE:
+            notificationPauseRef.current();
+            break;
+          case NOTIFICATION_ACTIONS.PLAY:
+            notificationResumeRef.current();
+            break;
+          case NOTIFICATION_ACTIONS.STOP:
+            stopAllSoundsRef.current();
+            break;
+          case NOTIFICATION_ACTIONS.NEXT:
+            notificationNextRef.current();
+            break;
+        }
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const handleOverlayPress = () => {
     handleClosePlayer();
