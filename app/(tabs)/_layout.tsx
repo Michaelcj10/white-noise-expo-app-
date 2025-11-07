@@ -373,32 +373,31 @@ export default function TabLayout() {
           <View
             style={{
               flex: 1,
-              padding: 24,
-              justifyContent: "space-between",
+              padding: 20,
             }}
           >
             <ScrollView
               contentContainerStyle={{
-                paddingTop: 40,
+                paddingTop: 20,
               }}
               showsVerticalScrollIndicator={false}
             >
-              <View style={{ alignItems: "center", marginBottom: 40 }}>
+              <View style={{ alignItems: "center", marginBottom: 24 }}>
                 <Image
                   source={themeMode === "dark" ? darkLogo : whiteLogo}
                   style={{
-                    width: 200,
-                    height: 80,
-                    marginBottom: 24,
+                    width: 160,
+                    height: 64,
+                    marginBottom: 16,
                   }}
                   contentFit="contain"
                 />
                 <Text
                   style={{
-                    fontSize: 32,
+                    fontSize: 26,
                     fontWeight: "800",
                     color: theme.text,
-                    marginBottom: 12,
+                    marginBottom: 8,
                     textAlign: "center",
                   }}
                 >
@@ -406,54 +405,54 @@ export default function TabLayout() {
                 </Text>
                 <Text
                   style={{
-                    fontSize: 18,
+                    fontSize: 16,
                     color: theme.textSecondary,
                     textAlign: "center",
-                    lineHeight: 26,
+                    lineHeight: 22,
                   }}
                 >
                   Your peaceful sanctuary for relaxation and focus
                 </Text>
               </View>
 
-              <View style={{ gap: 32 }}>
+              <View style={{ gap: 20 }}>
                 {/* Feature 1 */}
                 <View
                   style={{ flexDirection: "row", alignItems: "flex-start" }}
                 >
                   <View
                     style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
                       backgroundColor: theme.primary + "15",
                       justifyContent: "center",
                       alignItems: "center",
-                      marginRight: 16,
+                      marginRight: 12,
                     }}
                   >
                     <Ionicons
                       name="musical-notes"
-                      size={28}
+                      size={22}
                       color={theme.primary}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: "700",
                         color: theme.text,
-                        marginBottom: 8,
+                        marginBottom: 4,
                       }}
                     >
                       Curated Sounds
                     </Text>
                     <Text
                       style={{
-                        fontSize: 16,
+                        fontSize: 14,
                         color: theme.textSecondary,
-                        lineHeight: 24,
+                        lineHeight: 20,
                       }}
                     >
                       Choose from a variety of high-quality white noise, nature
@@ -469,33 +468,33 @@ export default function TabLayout() {
                 >
                   <View
                     style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
                       backgroundColor: theme.primary + "15",
                       justifyContent: "center",
                       alignItems: "center",
-                      marginRight: 16,
+                      marginRight: 12,
                     }}
                   >
-                    <Ionicons name="heart" size={28} color={theme.primary} />
+                    <Ionicons name="heart" size={22} color={theme.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: "700",
                         color: theme.text,
-                        marginBottom: 8,
+                        marginBottom: 4,
                       }}
                     >
                       Favorites & Quick Play
                     </Text>
                     <Text
                       style={{
-                        fontSize: 16,
+                        fontSize: 14,
                         color: theme.textSecondary,
-                        lineHeight: 24,
+                        lineHeight: 20,
                       }}
                     >
                       Save your favorite sounds and set up quick play for
@@ -510,33 +509,33 @@ export default function TabLayout() {
                 >
                   <View
                     style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
                       backgroundColor: theme.primary + "15",
                       justifyContent: "center",
                       alignItems: "center",
-                      marginRight: 16,
+                      marginRight: 12,
                     }}
                   >
-                    <Ionicons name="layers" size={28} color={theme.primary} />
+                    <Ionicons name="layers" size={22} color={theme.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: "700",
                         color: theme.text,
-                        marginBottom: 8,
+                        marginBottom: 4,
                       }}
                     >
                       Mix & Match
                     </Text>
                     <Text
                       style={{
-                        fontSize: 16,
+                        fontSize: 14,
                         color: theme.textSecondary,
-                        lineHeight: 24,
+                        lineHeight: 20,
                       }}
                     >
                       Create your perfect soundscape by mixing multiple sounds
@@ -544,36 +543,36 @@ export default function TabLayout() {
                     </Text>
                   </View>
                 </View>
+
+                {/* Button now appears after all features */}
+                <View style={{ paddingTop: 24, paddingBottom: 16 }}>
+                  <TouchableOpacity
+                    onPress={completeOnboarding}
+                    style={{
+                      backgroundColor: theme.primary,
+                      padding: 14,
+                      borderRadius: 12,
+                      alignItems: "center",
+                      shadowColor: theme.primary,
+                      shadowOffset: { width: 0, height: 3 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 6,
+                      elevation: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 16,
+                        fontWeight: "700",
+                      }}
+                    >
+                      Get Started
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </ScrollView>
-
-            {/* Fixed button at bottom */}
-            <View style={{ paddingTop: 24, paddingBottom: 20 }}>
-              <TouchableOpacity
-                onPress={completeOnboarding}
-                style={{
-                  backgroundColor: theme.primary,
-                  padding: 18,
-                  borderRadius: 16,
-                  alignItems: "center",
-                  shadowColor: theme.primary,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    color: "white",
-                    fontSize: 18,
-                    fontWeight: "700",
-                  }}
-                >
-                  Get Started
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </LinearGradient>
       </Modal>
