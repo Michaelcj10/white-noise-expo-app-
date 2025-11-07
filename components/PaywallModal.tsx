@@ -33,7 +33,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
     if (result.success) {
       Alert.alert(
         "Welcome to Slumbr Pro!",
-        "You now have access to all premium sounds and features."
+        "You now have access to all premium sounds, features, and a completely ad-free experience!"
       );
       onClose();
     }
@@ -55,12 +55,13 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
   }
 
   const features = [
+    {
+      icon: "close-circle",
+      text: "✨ No ads ever - completely ad-free experience",
+    },
     { icon: "musical-notes", text: "Access to all 21 premium sounds" },
-    { icon: "cloud-done", text: "Offline mode for all sounds" },
     { icon: "infinite", text: "Unlimited sound mixing" },
-    { icon: "timer", text: "Advanced timer options" },
-    { icon: "moon", text: "Perfect for sleep and focus" },
-    { icon: "close-circle", text: "No ads ever" },
+    { icon: "cloud-done", text: "Offline mode for all sounds" },
   ];
 
   return (
@@ -93,13 +94,13 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
             {/* Header */}
             <View style={styles.header}>
               <View style={styles.badge}>
-                <Ionicons name="star" size={32} color="#FFD700" />
+                <Ionicons name="star" size={24} color="#FFD700" />
               </View>
               <Text style={[styles.title, { color: theme.text }]}>
                 Upgrade to Slumbr Pro
               </Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-                Unlock all premium sounds and features
+                Ad-free experience • Premium sounds • Advanced features
               </Text>
             </View>
 
@@ -110,7 +111,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                   <View style={styles.featureIcon}>
                     <Ionicons
                       name={feature.icon as any}
-                      size={24}
+                      size={20}
                       color="#8b5cf6"
                     />
                   </View>
@@ -208,70 +209,70 @@ const styles = StyleSheet.create({
   content: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
-    paddingTop: 16,
+    padding: 20,
+    paddingTop: 12,
     maxHeight: "90%",
     borderTopWidth: 1,
   },
   closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "flex-end",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   header: {
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 20,
   },
   badge: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: "rgba(139, 92, 246, 0.1)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
     fontSize: 16,
     textAlign: "center",
   },
   features: {
-    marginBottom: 32,
+    marginBottom: 20,
   },
   featureRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   featureIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "rgba(139, 92, 246, 0.1)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
   featureText: {
-    fontSize: 16,
+    fontSize: 15,
     flex: 1,
   },
   pricing: {
-    gap: 12,
-    marginBottom: 24,
+    gap: 10,
+    marginBottom: 16,
   },
   priceButton: {
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     alignItems: "center",
     position: "relative",
   },
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
   terms: {
     fontSize: 12,
     textAlign: "center",
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 8,
+    marginBottom: 4,
   },
 });

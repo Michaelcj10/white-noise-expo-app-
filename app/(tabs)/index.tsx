@@ -1672,7 +1672,7 @@ export default function SoundsScreen() {
   }, [stopAllSounds]);
 
   useEffect(() => {
-    const wrappedStopAll = () => stopAllSoundsRef.current();
+    const wrappedStopAll = async () => await stopAllSoundsRef.current();
     setStopMainSounds(wrappedStopAll);
     return () => {
       setStopMainSounds(null);
@@ -1693,19 +1693,19 @@ export default function SoundsScreen() {
   useEffect(() => {
     // Listen for notification action responses
     const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
+      async (response) => {
         const action = response.actionIdentifier;
         console.log("📢 Notification action:", action);
 
         switch (action) {
           case NOTIFICATION_ACTIONS.PAUSE:
-            notificationPauseRef.current();
+            await notificationPauseRef.current();
             break;
           case NOTIFICATION_ACTIONS.PLAY:
-            notificationResumeRef.current();
+            await notificationResumeRef.current();
             break;
           case NOTIFICATION_ACTIONS.STOP:
-            stopAllSoundsRef.current();
+            await stopAllSoundsRef.current();
             break;
         }
       }
@@ -1806,6 +1806,30 @@ export default function SoundsScreen() {
               </View>
             )}
 
+            {/* Quick Play tag - show if this sound is set as the quick play option */}
+            {favoriteSoundId === String(soundItem.id) && (
+              <View
+                style={{
+                  backgroundColor: "#ff6b6b",
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 5,
+                  marginRight: 4,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "white",
+                    fontSize: 9,
+                    fontWeight: "700",
+                    letterSpacing: 0.3,
+                  }}
+                >
+                  QUICK PLAY
+                </Text>
+              </View>
+            )}
+
             {/* PRO badge for premium sounds OR Heart icon for free sounds */}
             {soundItem.premium ? (
               <View
@@ -1889,7 +1913,7 @@ export default function SoundsScreen() {
             <View style={styles.proBannerText}>
               <Text style={styles.proBannerTitle}>Upgrade to Pro</Text>
               <Text style={styles.proBannerSubtitle}>
-                Unlock all premium sounds & features
+                All premium sounds • No ads ever • Advanced features
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="white" />

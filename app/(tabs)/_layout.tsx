@@ -94,10 +94,10 @@ export default function TabLayout() {
     if (e && typeof (e as any).preventDefault === "function") {
       (e as any).preventDefault();
     }
-    // Light haptic feedback
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (!favoriteSoundId) {
+      // Light haptic for error/no action
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setShowNoQuickPlayModal(true);
       return;
     }
@@ -113,12 +113,18 @@ export default function TabLayout() {
 
     try {
       if (quickPlaySound && isQuickPlaying) {
+        // Medium haptic feedback for stopping
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
         // Stop current quick play
         await quickPlaySound.stopAsync();
         await quickPlaySound.unloadAsync();
         setQuickPlaySound(null);
         setIsQuickPlaying(false);
       } else {
+        // Heavy haptic feedback for starting quick play (emergency action)
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
         // Stop main screen sounds if any are playing
         if (stopMainSounds && typeof stopMainSounds === "function") {
           await stopMainSounds();
@@ -185,6 +191,8 @@ export default function TabLayout() {
   };
 
   const handleButtonPress = (e: { preventDefault: () => void } | undefined) => {
+    // Immediate light haptic feedback on button press for responsiveness
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     animateButtonPress();
     handlePanicPress(e);
   };
@@ -209,7 +217,7 @@ export default function TabLayout() {
             width: 64,
             height: 64,
             borderRadius: 32,
-            backgroundColor: isQuickPlaying ? theme.error : theme.success,
+            backgroundColor: "#ff6b6b",
             justifyContent: "center",
             alignItems: "center",
             shadowColor: "#000",

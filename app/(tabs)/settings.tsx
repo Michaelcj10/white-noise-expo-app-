@@ -447,7 +447,7 @@ export default function SettingsScreen() {
                 marginLeft: 12,
               }}
             >
-              Upgrade to Pro
+              Upgrade to Pro - No Ads Ever
             </Text>
           </TouchableOpacity>
         )}
@@ -630,8 +630,8 @@ export default function SettingsScreen() {
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
                 Key Features: • Extensive library of premium white noise sounds
                 • Customizable playback options • Background play support • Dark
-                mode for comfortable viewing • Favorite sound selection •
-                Ad-free experience with Pro upgrade
+                mode for comfortable viewing • Favorite sound selection • ✨
+                Completely ad-free experience with Pro upgrade
               </Text>
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
                 We&apos;re committed to helping you find your perfect
