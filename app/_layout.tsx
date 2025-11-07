@@ -33,8 +33,8 @@ export default function RootLayout() {
           // Hide native splash immediately since we have custom splash
           await SplashScreen.hideAsync();
 
-          // Show custom splash for minimum duration (better UX)
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          // Show custom splash for minimum duration (smoother UX)
+          await new Promise((resolve) => setTimeout(resolve, 1500));
 
           // Mark app as ready
           setAppReady(true);
@@ -59,13 +59,17 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider style={{ backgroundColor: "#0A0903" }}>
       <ThemeProvider>
         <RevenueCatProvider>
           <BackgroundPlayProvider>
             <QuickPlayProvider>
               <ScrollProvider>
-                <Stack>
+                <Stack
+                  screenOptions={{
+                    contentStyle: { backgroundColor: "#0A0903" },
+                  }}
+                >
                   <Stack.Screen
                     name="(tabs)"
                     options={{ headerShown: false }}

@@ -7,7 +7,6 @@ export const NOTIFICATION_ACTIONS = {
   PAUSE: "pause",
   PLAY: "play",
   STOP: "stop",
-  NEXT: "next",
 };
 
 // Configure notification behavior
@@ -35,13 +34,6 @@ const setupNotificationCategories = async () => {
         },
       },
       {
-        identifier: NOTIFICATION_ACTIONS.NEXT,
-        buttonTitle: "Next",
-        options: {
-          opensAppToForeground: false,
-        },
-      },
-      {
         identifier: NOTIFICATION_ACTIONS.STOP,
         buttonTitle: "Stop",
         options: {
@@ -54,13 +46,6 @@ const setupNotificationCategories = async () => {
       {
         identifier: NOTIFICATION_ACTIONS.PLAY,
         buttonTitle: "Play",
-        options: {
-          opensAppToForeground: false,
-        },
-      },
-      {
-        identifier: NOTIFICATION_ACTIONS.NEXT,
-        buttonTitle: "Next",
         options: {
           opensAppToForeground: false,
         },
@@ -95,6 +80,7 @@ export const setupAudioNotifications = async () => {
       bypassDnd: false,
       enableLights: false,
       enableVibrate: false,
+      showBadge: false,
     });
   }
 
@@ -117,13 +103,14 @@ export const showPlayingNotification = async (
     // Show new persistent notification with controls
     currentNotificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: isPaused ? "White Noise - Paused" : "White Noise - Now Playing",
+        title: isPaused ? "Slumbr - Paused" : "Slumbr - Now Playing",
         body: `${soundName}`,
         sound: undefined,
         priority: Notifications.AndroidNotificationPriority.LOW,
         sticky: true,
         badge: 0,
         categoryIdentifier: isPaused ? "playback-paused" : "playback",
+        color: "#0A0903", // Brand color for notification
         data: {
           type: "audio-playback",
           soundName,

@@ -26,7 +26,12 @@
         "backgroundColor": "#0A0903"
       },
       "edgeToEdgeEnabled": true,
-      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.slumbr.whitenoiseapp"
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.slumbr.whitenoiseapp",
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "FOREGROUND_SERVICE",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "bundler": "metro",

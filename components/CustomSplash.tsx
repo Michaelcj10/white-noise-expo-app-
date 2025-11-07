@@ -12,6 +12,9 @@ export const CustomSplash: React.FC = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
+  // Use dark theme as default to match native splash
+  const isDark = themeMode === "dark" || themeMode === undefined;
+
   useEffect(() => {
     // Start both animations in parallel
     Animated.parallel([
@@ -31,8 +34,8 @@ export const CustomSplash: React.FC = () => {
   return (
     <LinearGradient
       colors={
-        themeMode === "dark"
-          ? ["#000000", "#1a1a1a", "#2d2d2d"]
+        isDark
+          ? ["#0A0903", "#1a1a1a", "#2d2d2d"]
           : ["#ffffff", "#f5f5f5", "#e0e0e0"]
       }
       style={styles.container}
@@ -51,7 +54,7 @@ export const CustomSplash: React.FC = () => {
       >
         <Image
           style={styles.logo}
-          source={themeMode === "dark" ? darkLogo : whiteLogo}
+          source={isDark ? darkLogo : whiteLogo}
           contentFit="contain"
           transition={1000}
         />

@@ -6,7 +6,7 @@ import {
   WHITE_NOISE_SOUNDS,
 } from "@/constants/sound";
 import { Ionicons } from "@expo/vector-icons";
-import { Audio } from "expo-av";
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import * as Haptics from "expo-haptics";
 
 import { useQuickPlay } from "@/contexts/quickplay";
@@ -1002,6 +1002,8 @@ export default function SoundsScreen() {
           playsInSilentModeIOS: true,
           shouldDuckAndroid: true,
           playThroughEarpieceAndroid: false,
+          interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+          interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
         });
       }
     } catch (error) {
@@ -1014,6 +1016,25 @@ export default function SoundsScreen() {
 
     // Setup notifications for background playback
     setupAudioNotifications();
+
+    // Setup audio interruption handler
+    const setupAudioInterruptionHandler = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          staysActiveInBackground: backgroundPlayEnabled && !isWeb,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+          interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+          interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+        });
+      } catch (error) {
+        console.error("Error setting up audio interruption handling:", error);
+      }
+    };
+
+    setupAudioInterruptionHandler();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backgroundPlayEnabled]);
 
@@ -1412,9 +1433,18 @@ export default function SoundsScreen() {
           false // Don't download entire file before playing
         );
 
+        // Handle playback status updates including interruptions
         newSound.setOnPlaybackStatusUpdate((status) => {
           if ((status as any).isLoaded) {
             setIsPlaying((status as any).isPlaying);
+
+            // Handle audio interruptions (calls, other apps, etc.)
+            if (
+              (status as any).isPlaying === false &&
+              !(status as any).didJustFinish
+            ) {
+              console.log("⚠️ Audio interrupted or paused by system");
+            }
           }
         });
 
@@ -1570,14 +1600,12 @@ export default function SoundsScreen() {
   // Create refs for notification actions to avoid stale closures
   const notificationPauseRef = useRef(pauseAllSounds);
   const notificationResumeRef = useRef(resumeAllSounds);
-  const notificationNextRef = useRef(playNextFavorite);
 
   // Update refs when functions change
   useEffect(() => {
     notificationPauseRef.current = pauseAllSounds;
     notificationResumeRef.current = resumeAllSounds;
-    notificationNextRef.current = playNextFavorite;
-  }, [pauseAllSounds, resumeAllSounds, playNextFavorite]);
+  }, [pauseAllSounds, resumeAllSounds]);
 
   // Setup notification listener
   useEffect(() => {
@@ -1596,9 +1624,6 @@ export default function SoundsScreen() {
             break;
           case NOTIFICATION_ACTIONS.STOP:
             stopAllSoundsRef.current();
-            break;
-          case NOTIFICATION_ACTIONS.NEXT:
-            notificationNextRef.current();
             break;
         }
       }
