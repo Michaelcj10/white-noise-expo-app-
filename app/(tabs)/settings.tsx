@@ -5,6 +5,7 @@ import { useBackgroundPlay } from "@/contexts/backgroundplay";
 import { useRevenueCat } from "@/contexts/revenuecat";
 import { useScroll } from "@/contexts/scroll";
 import { useTheme } from "@/contexts/themecontext";
+import { Analytics } from "@/utils/analytics";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { Image } from "expo-image";
@@ -92,6 +93,13 @@ export default function SettingsScreen() {
     })();
   }, []);
 
+  // Track settings screen view
+  useFocusEffect(
+    useCallback(() => {
+      Analytics.trackSettingsOpened();
+    }, [])
+  );
+
   // Reload favorites count when screen comes into focus
   useFocusEffect(
     useCallback(() => {
@@ -168,6 +176,7 @@ export default function SettingsScreen() {
   const handleBackgroundPlayToggle = (enabled: boolean) => {
     setBackgroundPlayEnabled(enabled);
     if (enabled) {
+      Analytics.trackBackgroundPlayEnabled();
       setInfoModalContent({
         title: "Background Play Enabled",
         message:
@@ -176,6 +185,7 @@ export default function SettingsScreen() {
       });
       setInfoModalVisible(true);
     } else {
+      Analytics.trackBackgroundPlayDisabled();
       setInfoModalContent({
         title: "Background Play Disabled",
         message:
@@ -221,9 +231,14 @@ export default function SettingsScreen() {
       String(selectedSoundForConfirm.id)
     );
     setFavoriteSoundId(String(selectedSoundForConfirm.id));
-    setSelectedSoundForConfirm(null);
 
-    // Show success message
+    // Track quick play sound set
+    Analytics.trackQuickPlaySet(
+      selectedSoundForConfirm.id,
+      selectedSoundForConfirm.name
+    );
+
+    setSelectedSoundForConfirm(null); // Show success message
     setSuccessMessage(
       `${selectedSoundForConfirm.name} is now your quick play sound.`
     );
@@ -235,6 +250,9 @@ export default function SettingsScreen() {
     await Storage.setItem("favorite_sound_id", "");
     setFavoriteSoundId(null);
     setConfirmClearQuickPlayVisible(false);
+
+    // Track quick play cleared
+    Analytics.trackQuickPlayStopped();
 
     // Show success message
     setSuccessMessage("Quick play sound has been cleared.");
@@ -363,7 +381,11 @@ export default function SettingsScreen() {
           description={`Currently using ${themeMode} theme`}
           hasSwitch={true}
           switchValue={themeMode === "dark"}
-          onSwitchChange={toggleTheme}
+          onSwitchChange={() => {
+            const newMode = themeMode === "dark" ? "light" : "dark";
+            Analytics.trackThemeChanged(newMode);
+            toggleTheme();
+          }}
           color={theme.primary}
         />
 

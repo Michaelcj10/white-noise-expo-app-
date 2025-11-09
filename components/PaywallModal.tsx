@@ -1,5 +1,6 @@
+import { Analytics } from "@/utils/analytics";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -25,22 +26,34 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
     useRevenueCat();
   const [loading, setLoading] = useState(false);
 
+  // Track when paywall is viewed
+  useEffect(() => {
+    if (visible) {
+      Analytics.trackPaywallViewed("banner");
+    }
+  }, [visible]);
+
   const handlePurchase = async (pkg: PurchasesPackage) => {
     setLoading(true);
+    Analytics.trackPurchaseStarted(pkg.identifier, pkg.product.priceString);
     const result = await purchasePackage(pkg);
     setLoading(false);
 
     if (result.success) {
+      Analytics.trackPurchaseCompleted(pkg.identifier, pkg.product.priceString);
       Alert.alert(
         "Welcome to Slumbr Pro!",
         "You now have access to all premium sounds, features, and a completely ad-free experience!"
       );
       onClose();
+    } else {
+      Analytics.trackPurchaseFailed(pkg.identifier, "Purchase failed");
     }
   };
 
   const handleRestore = async () => {
     setLoading(true);
+    Analytics.trackRestorePurchases(true);
     const result = await restorePurchases();
     setLoading(false);
 
@@ -49,7 +62,10 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
     }
   };
 
-  // Don't show paywall if already pro
+  const handleClose = () => {
+    Analytics.trackPaywallDismissed();
+    onClose();
+  }; // Don't show paywall if already pro
   if (isPro) {
     return null;
   }
@@ -84,7 +100,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
           {/* Close button */}
           <TouchableOpacity
             style={[styles.closeButton, { backgroundColor: theme.border }]}
-            onPress={onClose}
+            onPress={handleClose}
             disabled={loading}
           >
             <Ionicons name="close" size={24} color={theme.text} />

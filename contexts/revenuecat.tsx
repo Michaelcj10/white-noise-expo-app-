@@ -105,9 +105,19 @@ export const RevenueCatProvider = ({
   const updateCustomerInfo = (info: CustomerInfo) => {
     setCustomerInfo(info);
 
+    // Debug: Log all active entitlements
+    console.log(
+      "🔍 Active entitlements:",
+      Object.keys(info.entitlements.active)
+    );
+    console.log("🔍 Looking for entitlement:", REVENUECAT_CONFIG.entitlementId);
+
     // Check if user has active entitlement for "slumbr Pro"
     const hasProAccess =
       info.entitlements.active[REVENUECAT_CONFIG.entitlementId] !== undefined;
+
+    console.log("🔍 hasProAccess result:", hasProAccess);
+    console.log("🔍 Setting isPro to:", hasProAccess);
 
     setIsPro(hasProAccess);
 
@@ -128,8 +138,13 @@ export const RevenueCatProvider = ({
     pkg: PurchasesPackage
   ): Promise<{ success: boolean }> => {
     try {
-      console.log("🛒 Attempting purchase:", pkg.identifier);
+      console.log("� Attempting purchase:", pkg.identifier);
       const { customerInfo: info } = await Purchases.purchasePackage(pkg);
+      console.log("💳 Purchase completed, updating customer info...");
+      console.log(
+        "🔍 Entitlements after purchase:",
+        Object.keys(info.entitlements.active)
+      );
       updateCustomerInfo(info);
       console.log("✅ Purchase successful");
       return { success: true };

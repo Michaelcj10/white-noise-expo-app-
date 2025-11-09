@@ -2,6 +2,7 @@
 import { WHITE_NOISE_SOUNDS } from "@/constants/sound";
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useScroll } from "@/contexts/scroll";
+import { Analytics } from "@/utils/analytics";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
@@ -121,6 +122,9 @@ export default function TabLayout() {
         await quickPlaySound.unloadAsync();
         setQuickPlaySound(null);
         setIsQuickPlaying(false);
+
+        // Track quick play stopped
+        Analytics.trackQuickPlayStopped();
       } else {
         // Heavy haptic feedback for starting quick play (emergency action)
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -156,6 +160,9 @@ export default function TabLayout() {
 
         setQuickPlaySound(newSound);
         setIsQuickPlaying(true);
+
+        // Track quick play used
+        Analytics.trackQuickPlayUsed(favoriteSound.id, favoriteSound.name);
       }
     } catch (error) {
       Alert.alert("Error", "Could not play sound");

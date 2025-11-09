@@ -6,6 +6,7 @@ import {
   SoundCategory,
   WHITE_NOISE_SOUNDS,
 } from "@/constants/sound";
+import { Analytics } from "@/utils/analytics";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import * as Haptics from "expo-haptics";
@@ -1167,6 +1168,7 @@ export default function SoundsScreen() {
           const newSeconds = prev - 1;
           if (newSeconds <= 0) {
             // Timer finished - stop all sounds
+            Analytics.trackTimerCompleted(timerMinutes);
             setTimeout(() => {
               stopAllSounds();
             }, 0);
@@ -1350,14 +1352,20 @@ export default function SoundsScreen() {
 
     // Only require pro for premium sounds
     if (isPremium && !pro) {
+      Analytics.trackPaywallViewed("favorite");
       setPaywallOpen(true);
       return;
     }
 
     const newFavorites = new Set(favorites);
+    const isAdding = !newFavorites.has(soundId);
+
     if (newFavorites.has(soundId)) {
       newFavorites.delete(soundId);
       showSnackbar("Removed from favorites");
+
+      // Track favorite removed
+      Analytics.trackFavoriteRemoved(soundId, sound?.name || "Unknown");
 
       // If we're viewing Favourites and this was the last one, switch to All
       if (selectedCategory === "Favourites" && newFavorites.size === 0) {
@@ -1366,6 +1374,14 @@ export default function SoundsScreen() {
     } else {
       newFavorites.add(soundId);
       showSnackbar("Added to favorites");
+
+      // Track favorite added
+      Analytics.trackFavoriteAdded(
+        soundId,
+        sound?.name || "Unknown",
+        isPremium
+      );
+      Analytics.incrementUserProperty("total_favorites_added", 1);
     }
     setFavorites(newFavorites);
     saveFavorites(newFavorites);
@@ -1556,11 +1572,20 @@ export default function SoundsScreen() {
 
     if (soundItem.premium && !pro) {
       console.log("Opening paywall for premium sound");
+      Analytics.trackPaywallViewed("premium_sound");
       setPaywallOpen(true);
       return;
     }
 
     console.log("Playing sound");
+
+    // Track sound played
+    Analytics.trackSoundPlayed(
+      soundItem.id,
+      soundItem.name,
+      soundItem.premium,
+      "single"
+    );
 
     // If this sound is already the only one playing, do nothing
     if (
@@ -1597,6 +1622,9 @@ export default function SoundsScreen() {
             return newSet;
           });
           showSnackbar(`${soundItem.name} saved for offline`);
+
+          // Track download
+          Analytics.trackSoundDownloaded(soundItem.id, soundItem.name);
         });
 
         const { sound: newSound } = await Audio.Sound.createAsync(
@@ -1679,6 +1707,9 @@ export default function SoundsScreen() {
     }
     setIsPlaying(false);
 
+    // Track pause event
+    Analytics.trackSoundPaused();
+
     // Update notification to show paused state
     if (activeSounds.size > 0) {
       const firstSound = Array.from(activeSounds.values())[0];
@@ -1695,6 +1726,9 @@ export default function SoundsScreen() {
       }
       setIsPlaying(true);
 
+      // Track resume event
+      Analytics.trackSoundResumed();
+
       // Update notification to show playing state
       if (activeSounds.size > 0) {
         const firstSound = Array.from(activeSounds.values())[0];
@@ -1710,6 +1744,8 @@ export default function SoundsScreen() {
 
   const stopAllSounds = useCallback(async () => {
     try {
+      const soundCount = activeSounds.size;
+
       // Clear timer first
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
@@ -1732,6 +1768,11 @@ export default function SoundsScreen() {
       setTimerMinutes(null);
       setTimerSeconds(0);
       setGlobalMuted(false);
+
+      // Track stop event if sounds were playing
+      if (soundCount > 0) {
+        Analytics.trackAllSoundsStopped(soundCount);
+      }
 
       // Hide notification when stopped
       await hidePlayingNotification();
@@ -1843,6 +1884,13 @@ export default function SoundsScreen() {
   };
 
   const handleSetTimer = (minutes: number | null) => {
+    if (minutes === null) {
+      // Clearing timer
+      Analytics.trackTimerCleared();
+    } else {
+      // Setting timer
+      Analytics.trackTimerSet(minutes);
+    }
     setTimerMinutes(minutes);
     setTimerSeconds(minutes ? minutes * 60 : 0);
   };
@@ -2060,8 +2108,9 @@ export default function SoundsScreen() {
               </View>
             )}
 
-            {/* PRO badge for premium sounds OR Heart icon for free sounds */}
-            {soundItem.premium ? (
+            {/* PRO badge for premium sounds (only if user doesn't have pro) OR Heart icon */}
+            {soundItem.premium && !pro ? (
+              // Show PRO badge for premium sounds when user doesn't have pro
               <View
                 style={{
                   backgroundColor: "#8b5cf6",
@@ -2083,6 +2132,7 @@ export default function SoundsScreen() {
                 </Text>
               </View>
             ) : (
+              // Show heart icon for free sounds OR premium sounds when user has pro
               <TouchableOpacity
                 onPress={handleHeartPress}
                 style={{
@@ -2152,7 +2202,10 @@ export default function SoundsScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.categoryTabs}
+        style={[
+          styles.categoryTabs,
+          { paddingTop: pro ? 12 : 6 }, // More top padding when user has pro
+        ]}
         contentContainerStyle={{
           paddingHorizontal: 16,
           gap: 8,
@@ -2175,6 +2228,7 @@ export default function SoundsScreen() {
             ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Analytics.trackCategorySelected("Favourites", favorites.size);
               setSelectedCategory("Favourites");
             }}
           >
@@ -2220,6 +2274,14 @@ export default function SoundsScreen() {
             ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Analytics.trackCategorySelected(
+                category,
+                WHITE_NOISE_SOUNDS.filter(
+                  (s) =>
+                    selectedCategory === SOUND_CATEGORIES.ALL ||
+                    s.category === category
+                ).length
+              );
               setSelectedCategory(category);
             }}
           >

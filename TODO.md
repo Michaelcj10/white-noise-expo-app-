@@ -6,3 +6,5 @@
 - [x] check background play works
 - [x] research how to add widget
 - [x] host audio files on website
+
+npx eas secret:create --scope project --name EXPO_MIXPANEL_TOKEN --value your_mixpanel_token_here --type string
