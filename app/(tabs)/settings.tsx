@@ -87,8 +87,18 @@ export default function SettingsScreen() {
 
       const storedFavorites = await Storage.getItem(FAVORITES_KEY);
       if (storedFavorites) {
-        const ids = JSON.parse(storedFavorites);
-        setFavoritesCount(ids.length);
+        try {
+          const ids = JSON.parse(storedFavorites);
+          if (Array.isArray(ids)) {
+            setFavoritesCount(ids.length);
+          } else {
+            console.error("Invalid favorites format");
+            setFavoritesCount(0);
+          }
+        } catch (error) {
+          console.error("Error parsing favorites:", error);
+          setFavoritesCount(0);
+        }
       }
     })();
   }, []);
@@ -106,8 +116,18 @@ export default function SettingsScreen() {
       (async () => {
         const storedFavorites = await Storage.getItem(FAVORITES_KEY);
         if (storedFavorites) {
-          const ids = JSON.parse(storedFavorites);
-          setFavoritesCount(ids.length);
+          try {
+            const ids = JSON.parse(storedFavorites);
+            if (Array.isArray(ids)) {
+              setFavoritesCount(ids.length);
+            } else {
+              console.error("Invalid favorites format");
+              setFavoritesCount(0);
+            }
+          } catch (error) {
+            console.error("Error parsing favorites:", error);
+            setFavoritesCount(0);
+          }
         } else {
           setFavoritesCount(0);
         }

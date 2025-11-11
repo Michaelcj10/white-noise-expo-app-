@@ -1,13 +1,43 @@
+import * as TrackingTransparency from "expo-tracking-transparency";
 import { Mixpanel } from "mixpanel-react-native";
 import { Platform } from "react-native";
 
 class AnalyticsService {
   private mixpanel: Mixpanel | null = null;
   private initialized = false;
+  private trackingAllowed = false;
+
+  async requestTrackingPermission(): Promise<boolean> {
+    try {
+      // Only request on iOS 14.5+
+      if (Platform.OS === "ios") {
+        const { status } =
+          await TrackingTransparency.requestTrackingPermissionsAsync();
+        this.trackingAllowed = status === "granted";
+        console.log("📊 Tracking permission status:", status);
+      } else {
+        // On Android and web, default to allowed
+        this.trackingAllowed = true;
+      }
+      return this.trackingAllowed;
+    } catch (error) {
+      console.error("❌ Failed to request tracking permission:", error);
+      this.trackingAllowed = false;
+      return false;
+    }
+  }
 
   async initialize(apiKey: string) {
     if (this.initialized || !apiKey) {
       console.log("📊 Analytics already initialized or no API key");
+      return;
+    }
+
+    // Request tracking permission first
+    await this.requestTrackingPermission();
+
+    if (!this.trackingAllowed) {
+      console.log("📊 Tracking not allowed - analytics disabled");
       return;
     }
 
@@ -28,7 +58,7 @@ class AnalyticsService {
 
   // User identification
   identifyUser(userId: string, traits?: Record<string, any>) {
-    if (!this.mixpanel) return;
+    if (!this.mixpanel || !this.trackingAllowed) return;
     this.mixpanel.identify(userId);
     if (traits) {
       this.mixpanel.getPeople().set(traits);
@@ -37,21 +67,21 @@ class AnalyticsService {
 
   // Set user properties
   setUserProperties(properties: Record<string, any>) {
-    if (!this.mixpanel) return;
+    if (!this.mixpanel || !this.trackingAllowed) return;
     this.mixpanel.getPeople().set(properties);
   }
 
   // Increment user property
   incrementUserProperty(property: string, by: number = 1) {
-    if (!this.mixpanel) return;
+    if (!this.mixpanel || !this.trackingAllowed) return;
     this.mixpanel.getPeople().increment(property, by);
   }
 
   // Track events with properties
   track(eventName: string, properties?: Record<string, any>) {
-    if (!this.mixpanel) {
+    if (!this.mixpanel || !this.trackingAllowed) {
       console.warn(
-        "⚠️ Cannot track event - Mixpanel not initialized:",
+        "⚠️ Cannot track event - Mixpanel not initialized or tracking not allowed:",
         eventName
       );
       return;
@@ -310,14 +340,19 @@ class AnalyticsService {
 
   // Flush events (call before app closes)
   async flush() {
-    if (!this.mixpanel) return;
+    if (!this.mixpanel || !this.trackingAllowed) return;
     await this.mixpanel.flush();
   }
 
   // Reset (for logout)
   reset() {
-    if (!this.mixpanel) return;
+    if (!this.mixpanel || !this.trackingAllowed) return;
     this.mixpanel.reset();
+  }
+
+  // Check if tracking is allowed
+  isTrackingAllowed(): boolean {
+    return this.trackingAllowed;
   }
 }
 

@@ -35,10 +35,17 @@ export const BackgroundPlayProvider: React.FC<{
     try {
       const setting = await AsyncStorage.getItem("backgroundPlayEnabled");
       if (setting !== null) {
-        setBackgroundPlayEnabledState(JSON.parse(setting));
+        const parsed = JSON.parse(setting);
+        // Validate that parsed data is a boolean
+        if (typeof parsed === "boolean") {
+          setBackgroundPlayEnabledState(parsed);
+        } else {
+          console.error("Invalid background play setting format");
+        }
       }
     } catch (error) {
       console.error("Error loading background play setting:", error);
+      // Keep default value (true) on error
     }
   };
 

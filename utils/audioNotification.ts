@@ -95,6 +95,13 @@ export const showPlayingNotification = async (
   isPaused: boolean = false
 ) => {
   try {
+    // Check if we have notification permissions
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== "granted") {
+      console.log("📢 No notification permission, skipping notification");
+      return;
+    }
+
     // Cancel existing notification if any
     if (currentNotificationId) {
       await Notifications.dismissNotificationAsync(currentNotificationId);

@@ -54,7 +54,13 @@
         }
       ],
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "This app uses data to provide personalized features and improve your experience."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

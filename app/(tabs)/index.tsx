@@ -1236,11 +1236,13 @@ export default function SoundsScreen() {
 
     const newActiveSounds = new Map(activeSounds);
     for (const [id, data] of newActiveSounds.entries()) {
-      try {
-        await data.sound.setVolumeAsync(newMuted ? 0 : data.volume);
-        data.isMuted = newMuted;
-      } catch (error) {
-        console.error("Error toggling mute:", error);
+      if (data?.sound) {
+        try {
+          await data.sound.setVolumeAsync(newMuted ? 0 : data.volume);
+          data.isMuted = newMuted;
+        } catch (error) {
+          console.error(`Error toggling mute for sound ${id}:`, error);
+        }
       }
     }
     setActiveSounds(newActiveSounds);
@@ -1302,10 +1304,18 @@ export default function SoundsScreen() {
         const stored = await Storage.getItem(FAVORITES_KEY);
         if (stored) {
           const ids = JSON.parse(stored);
-          setFavorites(new Set(ids));
+          // Validate that parsed data is an array
+          if (Array.isArray(ids)) {
+            setFavorites(new Set(ids));
+          } else {
+            console.error("Invalid favorites format, resetting");
+            setFavorites(new Set());
+          }
         }
       } catch (error) {
         console.error("Error loading favorites:", error);
+        // Reset to empty set on parse error
+        setFavorites(new Set());
       } finally {
         // Turn off initial loading after a brief delay to show skeleton
         setTimeout(() => setIsInitialLoad(false), 800);
@@ -1322,12 +1332,20 @@ export default function SoundsScreen() {
           const stored = await Storage.getItem(FAVORITES_KEY);
           if (stored) {
             const ids = JSON.parse(stored);
-            setFavorites(new Set(ids));
+            // Validate that parsed data is an array
+            if (Array.isArray(ids)) {
+              setFavorites(new Set(ids));
+            } else {
+              console.error("Invalid favorites format, resetting");
+              setFavorites(new Set());
+            }
           } else {
             setFavorites(new Set());
           }
         } catch (error) {
           console.error("Error loading favorites:", error);
+          // Reset to empty set on parse error
+          setFavorites(new Set());
         }
       };
       loadFavorites();
@@ -1444,9 +1462,13 @@ export default function SoundsScreen() {
     if (newActiveSounds.has(soundItem.id)) {
       // Remove sound
       const data = newActiveSounds.get(soundItem.id);
-      if (data) {
-        await data.sound.stopAsync();
-        await data.sound.unloadAsync();
+      if (data?.sound) {
+        try {
+          await data.sound.stopAsync();
+          await data.sound.unloadAsync();
+        } catch (error) {
+          console.error(`Error cleaning up sound ${soundItem.id}:`, error);
+        }
       }
       newActiveSounds.delete(soundItem.id);
 
@@ -1554,12 +1576,16 @@ export default function SoundsScreen() {
     const newActiveSounds = new Map(activeSounds);
     const data = newActiveSounds.get(soundId);
 
-    if (data) {
-      data.volume = volume;
-      if (!data.isMuted && !globalMuted) {
-        await data.sound.setVolumeAsync(volume);
+    if (data?.sound) {
+      try {
+        data.volume = volume;
+        if (!data.isMuted && !globalMuted) {
+          await data.sound.setVolumeAsync(volume);
+        }
+        setActiveSounds(newActiveSounds);
+      } catch (error) {
+        console.error(`Error changing volume for sound ${soundId}:`, error);
       }
-      setActiveSounds(newActiveSounds);
     }
   };
 
@@ -1702,8 +1728,14 @@ export default function SoundsScreen() {
   );
 
   const pauseAllSounds = useCallback(async () => {
-    for (const [id, data] of activeSounds.entries()) {
-      await data.sound.pauseAsync();
+    for (const [, data] of activeSounds.entries()) {
+      if (data?.sound) {
+        try {
+          await data.sound.pauseAsync();
+        } catch (error) {
+          console.error("Error pausing sound:", error);
+        }
+      }
     }
     setIsPlaying(false);
 
@@ -1721,8 +1753,14 @@ export default function SoundsScreen() {
 
   const resumeAllSounds = useCallback(async () => {
     try {
-      for (const [id, data] of activeSounds.entries()) {
-        await data.sound.playAsync();
+      for (const [, data] of activeSounds.entries()) {
+        if (data?.sound) {
+          try {
+            await data.sound.playAsync();
+          } catch (error) {
+            console.error("Error resuming sound:", error);
+          }
+        }
       }
       setIsPlaying(true);
 
@@ -1754,11 +1792,13 @@ export default function SoundsScreen() {
 
       // Stop and unload all sounds
       for (const [id, data] of activeSounds.entries()) {
-        try {
-          await data.sound.stopAsync();
-          await data.sound.unloadAsync();
-        } catch (error) {
-          console.error(`Error stopping sound ${id}:`, error);
+        if (data?.sound) {
+          try {
+            await data.sound.stopAsync();
+            await data.sound.unloadAsync();
+          } catch (error) {
+            console.error(`Error stopping sound ${id}:`, error);
+          }
         }
       }
 
@@ -1806,11 +1846,22 @@ export default function SoundsScreen() {
         const currentIndex = favoriteSounds.findIndex(
           (s) => s.id === currentSound.id
         );
-        const nextIndex = (currentIndex + 1) % favoriteSounds.length;
-        nextSound = favoriteSounds[nextIndex];
+        if (currentIndex !== -1) {
+          const nextIndex = (currentIndex + 1) % favoriteSounds.length;
+          nextSound = favoriteSounds[nextIndex];
+        } else {
+          // Current sound not in favorites, play first favorite
+          nextSound = favoriteSounds[0];
+        }
       } else {
         // No current sound, play first favorite
         nextSound = favoriteSounds[0];
+      }
+
+      // Validate nextSound exists
+      if (!nextSound) {
+        console.error("Could not determine next sound");
+        return;
       }
 
       // Check if premium
