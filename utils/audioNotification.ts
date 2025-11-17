@@ -24,70 +24,94 @@ let currentNotificationId: string | null = null;
 
 // Setup notification categories with actions (buttons)
 const setupNotificationCategories = async () => {
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationCategoryAsync("playback", [
-      {
-        identifier: NOTIFICATION_ACTIONS.PAUSE,
-        buttonTitle: "Pause",
-        options: {
-          opensAppToForeground: false,
+  try {
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationCategoryAsync("playback", [
+        {
+          identifier: NOTIFICATION_ACTIONS.PAUSE,
+          buttonTitle: "Pause",
+          options: {
+            opensAppToForeground: false,
+          },
         },
-      },
-      {
-        identifier: NOTIFICATION_ACTIONS.STOP,
-        buttonTitle: "Stop",
-        options: {
-          opensAppToForeground: false,
+        {
+          identifier: NOTIFICATION_ACTIONS.STOP,
+          buttonTitle: "Stop",
+          options: {
+            opensAppToForeground: false,
+          },
         },
-      },
-    ]);
+      ]);
 
-    await Notifications.setNotificationCategoryAsync("playback-paused", [
-      {
-        identifier: NOTIFICATION_ACTIONS.PLAY,
-        buttonTitle: "Play",
-        options: {
-          opensAppToForeground: false,
+      await Notifications.setNotificationCategoryAsync("playback-paused", [
+        {
+          identifier: NOTIFICATION_ACTIONS.PLAY,
+          buttonTitle: "Play",
+          options: {
+            opensAppToForeground: false,
+          },
         },
-      },
-      {
-        identifier: NOTIFICATION_ACTIONS.STOP,
-        buttonTitle: "Stop",
-        options: {
-          opensAppToForeground: false,
+        {
+          identifier: NOTIFICATION_ACTIONS.STOP,
+          buttonTitle: "Stop",
+          options: {
+            opensAppToForeground: false,
+          },
         },
-      },
-    ]);
+      ]);
+    }
+  } catch (error) {
+    // Gracefully handle category setup errors
+    console.log("📢 Unable to setup notification categories:", error);
   }
 };
 
 export const setupAudioNotifications = async () => {
-  // Request permission for notifications (required for Android)
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== "granted") {
-    console.log("Notification permission not granted");
+  try {
+    // Skip notifications on web
+    if (Platform.OS === "web") {
+      console.log("📢 Notifications not supported on web");
+      return false;
+    }
+
+    // Request permission for notifications (required for Android)
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== "granted") {
+      console.log(
+        "📢 Notification permission not granted - app will work without notifications"
+      );
+      return false;
+    }
+
+    // Create notification channel for Android
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("audio-playback", {
+        name: "Audio Playback",
+        importance: Notifications.AndroidImportance.LOW,
+        sound: null,
+        vibrationPattern: null,
+        lockscreenVisibility:
+          Notifications.AndroidNotificationVisibility.PUBLIC,
+        bypassDnd: false,
+        enableLights: false,
+        enableVibrate: false,
+        showBadge: false,
+      });
+    }
+
+    // Setup notification categories with action buttons
+    await setupNotificationCategories();
+
+    console.log("📢 Notifications setup successfully");
+    return true;
+  } catch (error) {
+    // Gracefully handle any setup errors
+    console.log(
+      "📢 Unable to setup notifications (app will continue without them):",
+      error
+    );
     return false;
   }
-
-  // Create notification channel for Android
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("audio-playback", {
-      name: "Audio Playback",
-      importance: Notifications.AndroidImportance.LOW,
-      sound: null,
-      vibrationPattern: null,
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      bypassDnd: false,
-      enableLights: false,
-      enableVibrate: false,
-      showBadge: false,
-    });
-  }
-
-  // Setup notification categories with action buttons
-  await setupNotificationCategories();
-
-  return true;
 };
 
 export const showPlayingNotification = async (
@@ -95,16 +119,26 @@ export const showPlayingNotification = async (
   isPaused: boolean = false
 ) => {
   try {
+    // Skip notifications on web
+    if (Platform.OS === "web") {
+      return;
+    }
+
     // Check if we have notification permissions
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== "granted") {
-      console.log("📢 No notification permission, skipping notification");
+      // Silently skip - user hasn't granted permission, app continues normally
       return;
     }
 
     // Cancel existing notification if any
     if (currentNotificationId) {
-      await Notifications.dismissNotificationAsync(currentNotificationId);
+      try {
+        await Notifications.dismissNotificationAsync(currentNotificationId);
+      } catch (dismissError) {
+        // Ignore dismiss errors, notification might already be gone
+        console.log("📢 Previous notification already dismissed");
+      }
     }
 
     // Show new persistent notification with controls
@@ -133,7 +167,11 @@ export const showPlayingNotification = async (
       isPaused ? "(Paused)" : ""
     );
   } catch (error) {
-    console.error("Error showing notification:", error);
+    // Gracefully handle notification errors - app continues working
+    console.log(
+      "📢 Unable to show notification (continuing without it):",
+      error
+    );
   }
 };
 
@@ -141,26 +179,48 @@ export const updatePlayingNotification = async (
   soundName: string,
   isPaused: boolean = false
 ) => {
+  // Skip on web
+  if (Platform.OS === "web") {
+    return;
+  }
   await showPlayingNotification(soundName, isPaused);
 };
 
 export const hidePlayingNotification = async () => {
   try {
+    // Skip on web
+    if (Platform.OS === "web") {
+      return;
+    }
+
     if (currentNotificationId) {
       await Notifications.dismissNotificationAsync(currentNotificationId);
       currentNotificationId = null;
       console.log("📢 Notification dismissed");
     }
   } catch (error) {
-    console.error("Error hiding notification:", error);
+    // Gracefully handle dismiss errors - notification might already be gone
+    console.log(
+      "📢 Unable to dismiss notification (it may have been dismissed already):",
+      error
+    );
+    currentNotificationId = null; // Clear the ID anyway
   }
 };
 
 export const clearAllNotifications = async () => {
   try {
+    // Skip on web
+    if (Platform.OS === "web") {
+      return;
+    }
+
     await Notifications.dismissAllNotificationsAsync();
     currentNotificationId = null;
+    console.log("📢 All notifications cleared");
   } catch (error) {
-    console.error("Error clearing notifications:", error);
+    // Gracefully handle clear errors
+    console.log("📢 Unable to clear notifications:", error);
+    currentNotificationId = null; // Clear the ID anyway
   }
 };

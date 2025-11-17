@@ -1,6 +1,19 @@
-import * as TrackingTransparency from "expo-tracking-transparency";
-import { Mixpanel } from "mixpanel-react-native";
 import { Platform } from "react-native";
+
+// Conditional imports for different platforms
+let TrackingTransparency: any;
+if (Platform.OS === "ios") {
+  // Use native module on iOS only (ATT is iOS-specific)
+  TrackingTransparency = require("expo-tracking-transparency");
+} else if (Platform.OS === "android") {
+  // Use Android mock (ATT not needed on Android)
+  TrackingTransparency = require("./trackingTransparency.android");
+} else {
+  // Use web mock for web platform
+  TrackingTransparency = require("./trackingTransparency.web");
+}
+
+import { Mixpanel } from "mixpanel-react-native";
 
 class AnalyticsService {
   private mixpanel: Mixpanel | null = null;

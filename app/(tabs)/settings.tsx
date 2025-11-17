@@ -489,7 +489,7 @@ export default function SettingsScreen() {
                 marginLeft: 12,
               }}
             >
-              Upgrade to Pro - No Ads Ever
+              Upgrade to Pro - Unlock 44 Premium Sounds
             </Text>
           </TouchableOpacity>
         )}
@@ -670,10 +670,11 @@ export default function SettingsScreen() {
                 provides the ideal backdrop for your needs.
               </Text>
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
-                Key Features: • Extensive library of premium white noise sounds
-                • Customizable playback options • Background play support • Dark
-                mode for comfortable viewing • Favorite sound selection • ✨
-                Completely ad-free experience with Pro upgrade
+                Key Features: • ✨ Completely ad-free (even on free version -
+                we'll never add ads) • 12 free sounds + 44 premium sounds
+                available • Customizable playback options • Background play
+                support • Dark mode for comfortable viewing • Favorite sound
+                selection
               </Text>
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
                 We&apos;re committed to helping you find your perfect

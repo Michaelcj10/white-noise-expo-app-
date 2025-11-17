@@ -1105,32 +1105,28 @@ export default function SoundsScreen() {
     }
   }, [backgroundPlayEnabled]);
 
+  // Configure audio session once at startup
   useEffect(() => {
-    configureAudioSession();
+    let mounted = true;
 
-    // Setup notifications for background playback
-    setupAudioNotifications();
+    const initAudio = async () => {
+      if (!mounted) return;
 
-    // Setup audio interruption handler
-    const setupAudioInterruptionHandler = async () => {
       try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          staysActiveInBackground: backgroundPlayEnabled && !isWeb,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-          interruptionModeIOS: InterruptionModeIOS.DuckOthers,
-          interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
-        });
+        await configureAudioSession();
+        setupAudioNotifications();
       } catch (error) {
-        console.error("Error setting up audio interruption handling:", error);
+        console.error("Error initializing audio:", error);
       }
     };
 
-    setupAudioInterruptionHandler();
+    initAudio();
+
+    return () => {
+      mounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backgroundPlayEnabled]);
+  }, []);
 
   // Handle app state changes (safe on web)
   useEffect(() => {
@@ -1211,7 +1207,7 @@ export default function SoundsScreen() {
     }
   };
 
-  const refreshSoundState = async () => {
+  const refreshSoundState = useCallback(async () => {
     const newActiveSounds = new Map(activeSounds);
     let hasPlaying = false;
 
@@ -1227,7 +1223,7 @@ export default function SoundsScreen() {
     }
 
     setIsPlaying(hasPlaying);
-  };
+  }, [activeSounds]);
 
   // Handle global mute/unmute
   const toggleGlobalMute = async () => {
@@ -1481,14 +1477,11 @@ export default function SoundsScreen() {
     } else {
       // Add sound
       try {
-        // Immediately mark as selected for border feedback
-        setSelectedSounds((prev) => new Set(prev).add(soundItem.id));
-
-        // Show loading state
-        setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
-
-        // Configure audio session non-blocking
-        configureAudioSession();
+        // Batch state updates to reduce re-renders
+        React.startTransition(() => {
+          setSelectedSounds((prev) => new Set(prev).add(soundItem.id));
+          setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
+        });
 
         // Get source with download callback (instant, non-blocking)
         const source = SoundCache.getSource(soundItem, () => {
@@ -1507,7 +1500,7 @@ export default function SoundsScreen() {
             isLooping: true,
             volume: globalMuted ? 0 : 0.5,
             shouldPlay: isPlaying,
-            progressUpdateIntervalMillis: 500,
+            progressUpdateIntervalMillis: 1000, // Reduced frequency for better performance
             // Optimize for faster initial playback
             androidImplementation: "MediaPlayer",
           },
@@ -1636,9 +1629,6 @@ export default function SoundsScreen() {
         // Show loading state
         setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
 
-        // Configure audio session non-blocking
-        configureAudioSession();
-
         // Get source with download callback (instant, non-blocking)
         const source = SoundCache.getSource(soundItem, () => {
           // Mark as downloaded and show toast
@@ -1659,7 +1649,7 @@ export default function SoundsScreen() {
             isLooping: true,
             volume: globalMuted ? 0 : 0.5,
             shouldPlay: true,
-            progressUpdateIntervalMillis: 500,
+            progressUpdateIntervalMillis: 1000, // Reduced frequency for better performance
             // Optimize for faster initial playback
             androidImplementation: "MediaPlayer",
           },
@@ -1710,7 +1700,12 @@ export default function SoundsScreen() {
         setSelectedSounds(new Set());
 
         // Show notification for background playback (not paused)
-        await showPlayingNotification(soundItem.name, false);
+        try {
+          await showPlayingNotification(soundItem.name, false);
+        } catch (notifError) {
+          // Silently ignore notification errors - they shouldn't crash playback
+          console.log("📢 Notification skipped:", notifError);
+        }
       } catch (error) {
         // Clear loading and selected state on error
         setLoadingSounds((prev) => {
@@ -1724,7 +1719,7 @@ export default function SoundsScreen() {
         console.error("Error playing sound:", error);
       }
     },
-    [globalMuted, showSnackbar, configureAudioSession]
+    [globalMuted, showSnackbar]
   );
 
   const pauseAllSounds = useCallback(async () => {
@@ -1746,7 +1741,12 @@ export default function SoundsScreen() {
     if (activeSounds.size > 0) {
       const firstSound = Array.from(activeSounds.values())[0];
       if (firstSound?.soundItem?.name) {
-        await showPlayingNotification(firstSound.soundItem.name, true);
+        try {
+          await showPlayingNotification(firstSound.soundItem.name, true);
+        } catch (notifError) {
+          // Silently ignore notification errors
+          console.log("📢 Notification skipped:", notifError);
+        }
       }
     }
   }, [activeSounds]);
@@ -1771,7 +1771,12 @@ export default function SoundsScreen() {
       if (activeSounds.size > 0) {
         const firstSound = Array.from(activeSounds.values())[0];
         if (firstSound?.soundItem?.name) {
-          await showPlayingNotification(firstSound.soundItem.name, false);
+          try {
+            await showPlayingNotification(firstSound.soundItem.name, false);
+          } catch (notifError) {
+            // Silently ignore notification errors
+            console.log("📢 Notification skipped:", notifError);
+          }
         }
       }
     } catch (error) {
@@ -1815,7 +1820,12 @@ export default function SoundsScreen() {
       }
 
       // Hide notification when stopped
-      await hidePlayingNotification();
+      try {
+        await hidePlayingNotification();
+      } catch (notifError) {
+        // Silently ignore notification errors
+        console.log("📢 Notification dismiss skipped:", notifError);
+      }
     } catch (error) {
       Alert.alert("Error", "Could not stop sounds.");
       console.error("Error stopping sounds:", error);
@@ -1934,7 +1944,7 @@ export default function SoundsScreen() {
     handleClosePlayer();
   };
 
-  const handleSetTimer = (minutes: number | null) => {
+  const handleSetTimer = useCallback((minutes: number | null) => {
     if (minutes === null) {
       // Clearing timer
       Analytics.trackTimerCleared();
@@ -1944,9 +1954,9 @@ export default function SoundsScreen() {
     }
     setTimerMinutes(minutes);
     setTimerSeconds(minutes ? minutes * 60 : 0);
-  };
+  }, []);
 
-  const formatTime = (seconds: number) => {
+  const formatTime = useCallback((seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
@@ -1957,10 +1967,10 @@ export default function SoundsScreen() {
         .padStart(2, "0")}`;
     }
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
-  };
+  }, []);
 
-  // Get display name for current sounds
-  const getCurrentSoundsDisplay = () => {
+  // Get display name for current sounds (memoized)
+  const getCurrentSoundsDisplay = React.useCallback(() => {
     const names = Array.from(activeSounds.values()).map(
       (data) => data.soundItem.name
     );
@@ -1968,248 +1978,269 @@ export default function SoundsScreen() {
     if (names.length === 1) return names[0];
     if (names.length === 2) return names.join(" & ");
     return `${names[0]} + ${names.length - 1} more`;
-  };
+  }, [activeSounds]);
 
-  function SoundCard({ soundItem, index }: { soundItem: any; index: number }) {
-    const isActive = activeSounds.has(soundItem.id);
-    const isQuickPlayActive =
-      isQuickPlaying && favoriteSoundId === String(soundItem.id);
-    const isLoading = loadingSounds.has(soundItem.id);
-    const isSelected = selectedSounds.has(soundItem.id);
+  // Memoized SoundCard to prevent unnecessary re-renders
+  const SoundCard = React.memo(
+    ({ soundItem, index }: { soundItem: any; index: number }) => {
+      const isActive = activeSounds.has(soundItem.id);
+      const isQuickPlayActive =
+        isQuickPlaying && favoriteSoundId === String(soundItem.id);
+      const isLoading = loadingSounds.has(soundItem.id);
+      const isSelected = selectedSounds.has(soundItem.id);
 
-    // Animation values
-    const cardScale = useRef(new Animated.Value(1)).current;
-    const heartScale = useRef(new Animated.Value(1)).current;
-    const iconPulse = useRef(new Animated.Value(1)).current;
+      // Animation values
+      const cardScale = useRef(new Animated.Value(1)).current;
+      const heartScale = useRef(new Animated.Value(1)).current;
+      const iconPulse = useRef(new Animated.Value(1)).current;
 
-    // Animate when sound becomes active/inactive
-    useEffect(() => {
-      if (isActive || isQuickPlayActive) {
-        // Start pulsing animation for icon
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(iconPulse, {
-              toValue: 1.15,
-              duration: 800,
-              easing: Easing.inOut(Easing.ease),
-              useNativeDriver: true,
-            }),
-            Animated.timing(iconPulse, {
-              toValue: 1,
-              duration: 800,
-              easing: Easing.inOut(Easing.ease),
-              useNativeDriver: true,
-            }),
-          ])
-        ).start();
-      } else {
-        // Stop pulsing
-        iconPulse.stopAnimation();
-        Animated.timing(iconPulse, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-      }
-    }, [isActive, isQuickPlayActive, iconPulse]);
+      // Animate when sound becomes active/inactive
+      useEffect(() => {
+        if (isActive || isQuickPlayActive) {
+          // Start pulsing animation for icon
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(iconPulse, {
+                toValue: 1.15,
+                duration: 800,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+              Animated.timing(iconPulse, {
+                toValue: 1,
+                duration: 800,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+            ])
+          ).start();
+        } else {
+          // Stop pulsing
+          iconPulse.stopAnimation();
+          Animated.timing(iconPulse, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        }
+      }, [isActive, isQuickPlayActive, iconPulse]);
 
-    const handlePress = () => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const handlePress = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      // Animate card press
-      Animated.sequence([
-        Animated.timing(cardScale, {
-          toValue: 0.97,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.spring(cardScale, {
-          toValue: 1,
-          friction: 3,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-      ]).start();
+        // Animate card press
+        Animated.sequence([
+          Animated.timing(cardScale, {
+            toValue: 0.97,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.spring(cardScale, {
+            toValue: 1,
+            friction: 3,
+            tension: 40,
+            useNativeDriver: true,
+          }),
+        ]).start();
 
-      // Gate playback
-      tryPlaySingle(soundItem);
-    };
+        // Gate playback
+        tryPlaySingle(soundItem);
+      };
 
-    const handleHeartPress = (e: any) => {
-      e.stopPropagation();
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const handleHeartPress = (e: any) => {
+        e.stopPropagation();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Animate heart with spring
-      Animated.sequence([
-        Animated.spring(heartScale, {
-          toValue: 1.3,
-          friction: 3,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-        Animated.spring(heartScale, {
-          toValue: 1,
-          friction: 3,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-      ]).start();
+        // Animate heart with spring
+        Animated.sequence([
+          Animated.spring(heartScale, {
+            toValue: 1.3,
+            friction: 3,
+            tension: 40,
+            useNativeDriver: true,
+          }),
+          Animated.spring(heartScale, {
+            toValue: 1,
+            friction: 3,
+            tension: 40,
+            useNativeDriver: true,
+          }),
+        ]).start();
 
-      toggleFavorite(soundItem.id);
-    };
+        toggleFavorite(soundItem.id);
+      };
 
-    return (
-      <Animated.View
-        style={{
-          transform: [{ scale: cardScale }],
-        }}
-      >
-        <TouchableOpacity
-          style={[
-            styles.soundCard,
-            { backgroundColor: theme.surface, borderColor: theme.border },
-            (isActive || isQuickPlayActive || isSelected) && {
-              borderColor: theme.primary,
-              backgroundColor: theme.card,
-            },
-          ]}
-          onPress={handlePress}
-          activeOpacity={0.8}
-          disabled={isLoading}
+      return (
+        <Animated.View
+          style={{
+            transform: [{ scale: cardScale }],
+          }}
         >
-          <Animated.View
+          <TouchableOpacity
             style={[
-              styles.iconContainer,
-              {
-                backgroundColor: soundItem.color,
-                transform: [{ scale: iconPulse }],
+              styles.soundCard,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              (isActive || isQuickPlayActive || isSelected) && {
+                borderColor: theme.primary,
+                backgroundColor: theme.card,
               },
             ]}
+            onPress={handlePress}
+            activeOpacity={0.8}
+            disabled={isLoading}
           >
-            {isLoading ? (
-              <View style={{ position: "relative" }}>
-                <ActivityIndicator size="small" color="white" />
+            <Animated.View
+              style={[
+                styles.iconContainer,
+                {
+                  backgroundColor: soundItem.color,
+                  transform: [{ scale: iconPulse }],
+                },
+              ]}
+            >
+              {isLoading ? (
+                <View style={{ position: "relative" }}>
+                  <ActivityIndicator size="small" color="white" />
+                  <View
+                    style={{
+                      position: "absolute",
+                      bottom: -2,
+                      right: -2,
+                      backgroundColor: soundItem.color,
+                      borderRadius: 8,
+                      paddingHorizontal: 4,
+                      paddingVertical: 1,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 8,
+                        fontWeight: "600",
+                      }}
+                    >
+                      ...
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <Ionicons name={soundItem.icon} size={24} color="white" />
+              )}
+            </Animated.View>
+
+            <View style={styles.soundInfo}>
+              <Text style={[styles.soundName, { color: theme.text }]}>
+                {soundItem.name}
+              </Text>
+              <Text
+                style={[
+                  styles.soundDescription,
+                  { color: theme.textSecondary },
+                ]}
+              >
+                {soundItem.description}
+              </Text>
+            </View>
+
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              {/* Download indicator - show if sound is downloaded */}
+              {downloadedSounds.has(soundItem.id) && (
+                <View style={{ padding: 8 }}>
+                  <Ionicons name="cloud-done" size={20} color="#10b981" />
+                </View>
+              )}
+
+              {/* Quick Play tag - show if this sound is set as the quick play option */}
+              {favoriteSoundId === String(soundItem.id) && (
                 <View
                   style={{
-                    position: "absolute",
-                    bottom: -2,
-                    right: -2,
-                    backgroundColor: soundItem.color,
-                    borderRadius: 8,
-                    paddingHorizontal: 4,
-                    paddingVertical: 1,
+                    backgroundColor: "#ff6b6b",
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 5,
+                    marginRight: 4,
                   }}
                 >
                   <Text
                     style={{
                       color: "white",
-                      fontSize: 8,
-                      fontWeight: "600",
+                      fontSize: 9,
+                      fontWeight: "700",
+                      letterSpacing: 0.3,
                     }}
                   >
-                    ...
+                    QUICK PLAY
                   </Text>
                 </View>
-              </View>
-            ) : (
-              <Ionicons name={soundItem.icon} size={24} color="white" />
-            )}
-          </Animated.View>
+              )}
 
-          <View style={styles.soundInfo}>
-            <Text style={[styles.soundName, { color: theme.text }]}>
-              {soundItem.name}
-            </Text>
-            <Text
-              style={[styles.soundDescription, { color: theme.textSecondary }]}
-            >
-              {soundItem.description}
-            </Text>
-          </View>
-
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            {/* Download indicator - show if sound is downloaded */}
-            {downloadedSounds.has(soundItem.id) && (
-              <View style={{ padding: 8 }}>
-                <Ionicons name="cloud-done" size={20} color="#10b981" />
-              </View>
-            )}
-
-            {/* Quick Play tag - show if this sound is set as the quick play option */}
-            {favoriteSoundId === String(soundItem.id) && (
-              <View
-                style={{
-                  backgroundColor: "#ff6b6b",
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: 5,
-                  marginRight: 4,
-                }}
-              >
-                <Text
+              {/* PRO badge for premium sounds (only if user doesn't have pro) OR Heart icon */}
+              {soundItem.premium && !pro ? (
+                // Show PRO badge for premium sounds when user doesn't have pro
+                <View
                   style={{
-                    color: "white",
-                    fontSize: 9,
-                    fontWeight: "700",
-                    letterSpacing: 0.3,
+                    backgroundColor: "#8b5cf6",
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 6,
+                    marginRight: 8,
                   }}
                 >
-                  QUICK PLAY
-                </Text>
-              </View>
-            )}
-
-            {/* PRO badge for premium sounds (only if user doesn't have pro) OR Heart icon */}
-            {soundItem.premium && !pro ? (
-              // Show PRO badge for premium sounds when user doesn't have pro
-              <View
-                style={{
-                  backgroundColor: "#8b5cf6",
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                  marginRight: 8,
-                }}
-              >
-                <Text
+                  <Text
+                    style={{
+                      color: "white",
+                      fontSize: 10,
+                      fontWeight: "700",
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    PRO
+                  </Text>
+                </View>
+              ) : (
+                // Show heart icon for free sounds OR premium sounds when user has pro
+                <TouchableOpacity
+                  onPress={handleHeartPress}
                   style={{
-                    color: "white",
-                    fontSize: 10,
-                    fontWeight: "700",
-                    letterSpacing: 0.5,
+                    padding: 8,
                   }}
                 >
-                  PRO
-                </Text>
-              </View>
-            ) : (
-              // Show heart icon for free sounds OR premium sounds when user has pro
-              <TouchableOpacity
-                onPress={handleHeartPress}
-                style={{
-                  padding: 8,
-                }}
-              >
-                <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-                  <Ionicons
-                    name={
-                      favorites?.has(soundItem.id) ? "heart" : "heart-outline"
-                    }
-                    size={22}
-                    color={
-                      favorites?.has(soundItem.id)
-                        ? "#FF6B6B"
-                        : theme.textSecondary
-                    }
-                  />
-                </Animated.View>
-              </TouchableOpacity>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  }
+                  <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                    <Ionicons
+                      name={
+                        favorites?.has(soundItem.id) ? "heart" : "heart-outline"
+                      }
+                      size={22}
+                      color={
+                        favorites?.has(soundItem.id)
+                          ? "#FF6B6B"
+                          : theme.textSecondary
+                      }
+                    />
+                  </Animated.View>
+                </TouchableOpacity>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    }
+  );
+
+  // Memoize filtered sounds to prevent double filtering
+  const filteredSounds = React.useMemo(() => {
+    return WHITE_NOISE_SOUNDS.filter((sound) => {
+      if (selectedCategory === "Favourites") {
+        return favorites?.has(sound.id) || false;
+      }
+      return (
+        selectedCategory === SOUND_CATEGORIES.ALL ||
+        sound.category === selectedCategory
+      );
+    });
+  }, [selectedCategory, favorites]);
 
   return (
     <View
@@ -2242,7 +2273,7 @@ export default function SoundsScreen() {
             <View style={styles.proBannerText}>
               <Text style={styles.proBannerTitle}>Upgrade to Pro</Text>
               <Text style={styles.proBannerSubtitle}>
-                All premium sounds • No ads ever • Advanced features
+                Free has no ads • Unlock 44 premium sounds
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="white" />
@@ -2383,46 +2414,17 @@ export default function SoundsScreen() {
             </>
           ) : (
             <>
-              {WHITE_NOISE_SOUNDS.filter((sound) => {
-                // Handle Favourites category
-                if (selectedCategory === "Favourites") {
-                  return favorites?.has(sound.id) || false;
-                }
-                // Handle regular categories
-                return (
-                  selectedCategory === SOUND_CATEGORIES.ALL ||
-                  sound.category === selectedCategory
-                );
-              }).length === 0 ? (
+              {filteredSounds.length === 0 ? (
                 // Show empty state when no sounds match the filter
                 <EmptyPlayerState theme={theme} />
               ) : (
-                WHITE_NOISE_SOUNDS.filter((sound) => {
-                  // Handle Favourites category
-                  if (selectedCategory === "Favourites") {
-                    return favorites?.has(sound.id) || false;
-                  }
-                  // Handle regular categories
-                  return (
-                    selectedCategory === SOUND_CATEGORIES.ALL ||
-                    sound.category === selectedCategory
-                  );
-                })
-                  .sort((a, b) => {
-                    // Free sounds first, then premium
-                    if (a.premium !== b.premium) {
-                      return a.premium ? 1 : -1;
-                    }
-                    // Then alphabetically
-                    return a.name.localeCompare(b.name);
-                  })
-                  .map((soundItem, index) => (
-                    <SoundCard
-                      key={soundItem.id}
-                      soundItem={soundItem}
-                      index={index}
-                    />
-                  ))
+                filteredSounds.map((soundItem, index) => (
+                  <SoundCard
+                    key={soundItem.id}
+                    soundItem={soundItem}
+                    index={index}
+                  />
+                ))
               )}
             </>
           )}

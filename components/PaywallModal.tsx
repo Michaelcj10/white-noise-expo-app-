@@ -72,12 +72,12 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
 
   const features = [
     {
-      icon: "close-circle",
-      text: "✨ No ads ever - completely ad-free experience",
+      icon: "musical-notes",
+      text: "Access to all 44 premium sounds",
     },
-    { icon: "musical-notes", text: "Access to all 21 premium sounds" },
-    { icon: "infinite", text: "Unlimited sound mixing" },
-    { icon: "cloud-done", text: "Offline mode for all sounds" },
+    { icon: "infinite", text: "Advanced mixing and customization" },
+    { icon: "cloud-done", text: "Enhanced offline mode" },
+    { icon: "heart", text: "Support continued development" },
   ];
 
   return (
@@ -116,7 +116,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                 Upgrade to Slumbr Pro
               </Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-                Ad-free experience • Premium sounds • Advanced features
+                Even free has no ads • Upgrade for 44 premium sounds
               </Text>
             </View>
 
