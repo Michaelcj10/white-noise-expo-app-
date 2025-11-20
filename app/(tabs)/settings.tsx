@@ -503,7 +503,7 @@ export default function SettingsScreen() {
               backgroundColor: theme.card,
               borderRadius: 12,
               borderWidth: 1,
-              borderColor: "#8b5cf6",
+              borderColor: "#FFD700",
             }}
           >
             <View
@@ -513,10 +513,10 @@ export default function SettingsScreen() {
                 marginBottom: 12,
               }}
             >
-              <Ionicons name="checkmark-circle" size={24} color="#8b5cf6" />
+              <Ionicons name="checkmark-circle" size={24} color="#FFD700" />
               <Text
                 style={{
-                  color: theme.text,
+                  color: "#FFD700",
                   fontSize: 18,
                   fontWeight: "700",
                   marginLeft: 8,
@@ -527,36 +527,13 @@ export default function SettingsScreen() {
             </View>
             <Text
               style={{
-                color: theme.textSecondary,
+                color: "#FFD700",
                 fontSize: 14,
                 marginBottom: 12,
               }}
             >
               You have access to all premium sounds and features.
             </Text>
-            <TouchableOpacity
-              onPress={() => setPaywallOpen(true)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: theme.border,
-                padding: 12,
-                borderRadius: 8,
-              }}
-            >
-              <Ionicons name="settings-outline" size={18} color={theme.text} />
-              <Text
-                style={{
-                  color: theme.text,
-                  fontSize: 14,
-                  fontWeight: "600",
-                  marginLeft: 8,
-                }}
-              >
-                Manage Subscription
-              </Text>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -670,8 +647,8 @@ export default function SettingsScreen() {
                 provides the ideal backdrop for your needs.
               </Text>
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
-                Key Features: • ✨ Completely ad-free (even on free version -
-                we'll never add ads) • 12 free sounds + 44 premium sounds
+                Key Features: • ✨ Completely ad-free (even on free version - we
+                will never add ads) • 12 free sounds + 44 premium sounds
                 available • Customizable playback options • Background play
                 support • Dark mode for comfortable viewing • Favorite sound
                 selection

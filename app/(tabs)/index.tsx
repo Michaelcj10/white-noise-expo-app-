@@ -7,6 +7,7 @@ import {
   WHITE_NOISE_SOUNDS,
 } from "@/constants/sound";
 import { Analytics } from "@/utils/analytics";
+import { soundCache } from "@/utils/soundCache";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import * as Haptics from "expo-haptics";
@@ -66,45 +67,6 @@ const Storage = {
       return;
     }
     return SecureStore.setItemAsync(key, value);
-  },
-};
-
-/* ---------- Downloaded Sounds Tracker ---------- */
-const DownloadedSounds = {
-  downloaded: new Set<number>(),
-
-  markAsDownloaded(soundId: number) {
-    this.downloaded.add(soundId);
-  },
-
-  isDownloaded(soundId: number): boolean {
-    return this.downloaded.has(soundId);
-  },
-};
-
-/* ---------- Sound Source Helper ---------- */
-const SoundCache = {
-  getSource(soundItem: any, onFirstLoad?: () => void) {
-    // For local sounds, return the required asset directly
-    if (soundItem.isLocal) {
-      return soundItem.source;
-    }
-
-    // For remote sounds, mark as downloaded after first successful load (non-blocking)
-    if (!DownloadedSounds.isDownloaded(soundItem.id)) {
-      // Mark as downloaded in background without blocking
-      setTimeout(() => {
-        DownloadedSounds.markAsDownloaded(soundItem.id);
-        onFirstLoad?.();
-      }, 100);
-    }
-
-    // Return immediately without waiting
-    return { uri: soundItem.source };
-  },
-
-  isDownloaded(soundId: number): boolean {
-    return DownloadedSounds.isDownloaded(soundId);
   },
 };
 
@@ -1113,6 +1075,14 @@ export default function SoundsScreen() {
       if (!mounted) return;
 
       try {
+        // Initialize sound cache for offline support
+        await soundCache.initialize();
+
+        // Load downloaded sounds into state
+        const downloadedIds = soundCache.getDownloadedSoundIds();
+        setDownloadedSounds(new Set(downloadedIds));
+        console.log(`📦 Loaded ${downloadedIds.length} cached sounds`);
+
         await configureAudioSession();
         setupAudioNotifications();
       } catch (error) {
@@ -1126,9 +1096,7 @@ export default function SoundsScreen() {
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Handle app state changes (safe on web)
+  }, []); // Handle app state changes (safe on web)
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === "background" || nextAppState === "inactive") {
@@ -1191,10 +1159,7 @@ export default function SoundsScreen() {
     try {
       if (!isWeb && activeSounds.size > 0) {
         const soundNames = Array.from(activeSounds.values())
-          .map((data) => {
-            const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === data.id);
-            return sound?.name || "Unknown";
-          })
+          .map((data) => data.soundItem?.name || "Unknown")
           .join(", ");
 
         // This would require expo-av's Audio.setNowPlayingInfo (if available)
@@ -1483,16 +1448,36 @@ export default function SoundsScreen() {
           setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
         });
 
-        // Get source with download callback (instant, non-blocking)
-        const source = SoundCache.getSource(soundItem, () => {
-          // Mark as downloaded and show toast
+        // Get source using sound cache (will use cached version if available)
+        const source = await soundCache.getSource(soundItem, true);
+
+        // Register callback for when download completes
+        if (!soundCache.isDownloaded(soundItem.id)) {
+          soundCache.onDownloadComplete(soundItem.id, (completedId: number) => {
+            setDownloadedSounds((prev) => {
+              const newSet = new Set(prev);
+              newSet.add(completedId);
+              return newSet;
+            });
+            const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === completedId);
+            if (sound) {
+              showSnackbar(`${sound.name} saved for offline`);
+              Analytics.trackSoundDownloaded(completedId, sound.name);
+            }
+          });
+        }
+
+        // If sound was already downloaded, update UI immediately
+        if (
+          soundCache.isDownloaded(soundItem.id) &&
+          !downloadedSounds.has(soundItem.id)
+        ) {
           setDownloadedSounds((prev) => {
             const newSet = new Set(prev);
             newSet.add(soundItem.id);
             return newSet;
           });
-          showSnackbar(`${soundItem.name} saved for offline`);
-        });
+        }
 
         const { sound: newSound } = await Audio.Sound.createAsync(
           source,
@@ -1526,7 +1511,7 @@ export default function SoundsScreen() {
           soundItem,
           volume: 0.5,
           isMuted: globalMuted,
-          id: 0,
+          id: soundItem.id,
         });
 
         // Clear selectedSounds since it's now active
@@ -1629,19 +1614,36 @@ export default function SoundsScreen() {
         // Show loading state
         setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
 
-        // Get source with download callback (instant, non-blocking)
-        const source = SoundCache.getSource(soundItem, () => {
-          // Mark as downloaded and show toast
+        // Get source using sound cache (will use cached version if available)
+        const source = await soundCache.getSource(soundItem, true);
+
+        // Register callback for when download completes
+        if (!soundCache.isDownloaded(soundItem.id)) {
+          soundCache.onDownloadComplete(soundItem.id, (completedId: number) => {
+            setDownloadedSounds((prev) => {
+              const newSet = new Set(prev);
+              newSet.add(completedId);
+              return newSet;
+            });
+            const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === completedId);
+            if (sound) {
+              showSnackbar(`${sound.name} saved for offline`);
+              Analytics.trackSoundDownloaded(completedId, sound.name);
+            }
+          });
+        }
+
+        // If sound was already downloaded, update UI immediately
+        if (
+          soundCache.isDownloaded(soundItem.id) &&
+          !downloadedSounds.has(soundItem.id)
+        ) {
           setDownloadedSounds((prev) => {
             const newSet = new Set(prev);
             newSet.add(soundItem.id);
             return newSet;
           });
-          showSnackbar(`${soundItem.name} saved for offline`);
-
-          // Track download
-          Analytics.trackSoundDownloaded(soundItem.id, soundItem.name);
-        });
+        }
 
         const { sound: newSound } = await Audio.Sound.createAsync(
           source,
@@ -1691,6 +1693,7 @@ export default function SoundsScreen() {
           soundItem,
           volume: 0.5,
           isMuted: globalMuted,
+          id: soundItem.id,
         });
 
         setActiveSounds(newActiveSounds);
@@ -2129,9 +2132,35 @@ export default function SoundsScreen() {
             </Animated.View>
 
             <View style={styles.soundInfo}>
-              <Text style={[styles.soundName, { color: theme.text }]}>
-                {soundItem.name}
-              </Text>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
+                <Text style={[styles.soundName, { color: theme.text }]}>
+                  {soundItem.name}
+                </Text>
+                {/* Quick Play tag - show if this sound is set as the quick play option */}
+                {favoriteSoundId === String(soundItem.id) && (
+                  <View
+                    style={{
+                      backgroundColor: "#ff6b6b",
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 9,
+                        fontWeight: "700",
+                        letterSpacing: 0.3,
+                      }}
+                    >
+                      QUICK PLAY
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text
                 style={[
                   styles.soundDescription,
@@ -2149,30 +2178,6 @@ export default function SoundsScreen() {
               {downloadedSounds.has(soundItem.id) && (
                 <View style={{ padding: 8 }}>
                   <Ionicons name="cloud-done" size={20} color="#10b981" />
-                </View>
-              )}
-
-              {/* Quick Play tag - show if this sound is set as the quick play option */}
-              {favoriteSoundId === String(soundItem.id) && (
-                <View
-                  style={{
-                    backgroundColor: "#ff6b6b",
-                    paddingHorizontal: 8,
-                    paddingVertical: 3,
-                    borderRadius: 5,
-                    marginRight: 4,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "white",
-                      fontSize: 9,
-                      fontWeight: "700",
-                      letterSpacing: 0.3,
-                    }}
-                  >
-                    QUICK PLAY
-                  </Text>
                 </View>
               )}
 
@@ -2228,6 +2233,7 @@ export default function SoundsScreen() {
       );
     }
   );
+  SoundCard.displayName = "SoundCard";
 
   // Memoize filtered sounds to prevent double filtering
   const filteredSounds = React.useMemo(() => {
@@ -2281,12 +2287,72 @@ export default function SoundsScreen() {
         </TouchableOpacity>
       )}
 
+      {/* Pro Badge - shown when user has pro subscription */}
+      {pro && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingVertical: 8,
+            paddingHorizontal: 16,
+            marginHorizontal: 16,
+            marginTop: 12,
+            marginBottom: 4,
+            backgroundColor: "rgba(255, 215, 0, 0.15)",
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: "rgba(255, 215, 0, 0.3)",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#FFD700",
+              borderRadius: 8,
+              padding: 4,
+              marginRight: 8,
+            }}
+          >
+            <Ionicons name="star" size={16} color="#0A0903" />
+          </View>
+          <Text
+            style={{
+              color: "#FFD700",
+              fontSize: 13,
+              fontWeight: "700",
+              letterSpacing: 0.5,
+            }}
+          >
+            PRO MEMBER
+          </Text>
+          <View
+            style={{
+              marginLeft: 8,
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              backgroundColor: "rgba(255, 215, 0, 0.2)",
+              borderRadius: 6,
+            }}
+          >
+            <Text
+              style={{
+                color: "#FFD700",
+                fontSize: 10,
+                fontWeight: "600",
+              }}
+            >
+              ALL SOUNDS UNLOCKED
+            </Text>
+          </View>
+        </View>
+      )}
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={[
           styles.categoryTabs,
-          { paddingTop: pro ? 12 : 6 }, // More top padding when user has pro
+          { paddingTop: pro ? 4 : 6 }, // Less top padding when pro badge is shown
         ]}
         contentContainerStyle={{
           paddingHorizontal: 16,
