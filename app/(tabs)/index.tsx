@@ -2086,6 +2086,7 @@ export default function SoundsScreen() {
               (isActive || isQuickPlayActive || isSelected) && {
                 borderColor: theme.primary,
                 backgroundColor: theme.card,
+                borderWidth: 2.5,
               },
             ]}
             onPress={handlePress}
@@ -2537,61 +2538,157 @@ export default function SoundsScreen() {
               </View>
             )}
 
-            <View style={styles.controlsRow}>
-              <AnimatedControlButton
-                onPress={() => {
-                  if (!pro) {
-                    setPaywallOpen(true);
-                  } else {
-                    setMixerModalVisible(true);
-                  }
-                }}
-                iconName="options"
+            {/* Sound info and controls layout */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                justifyContent: "space-between",
+              }}
+            >
+              {/* Sound info on the left */}
+              {activeSounds.size > 0 && (
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  {/* Colored circle with icon */}
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: Array.from(activeSounds.values())[0]
+                        ?.soundItem?.color,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Ionicons
+                      name={
+                        Array.from(activeSounds.values())[0]?.soundItem?.icon ||
+                        "musical-notes"
+                      }
+                      size={22}
+                      color="white"
+                    />
+                  </View>
+
+                  {/* Sound name and count */}
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        fontSize: 16,
+                        fontWeight: "700",
+                        color: theme.text,
+                        marginBottom: 2,
+                      }}
+                    >
+                      {Array.from(activeSounds.values())[0]?.soundItem?.name}
+                    </Text>
+                    {activeSounds.size > 1 && (
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: theme.textSecondary,
+                          fontWeight: "500",
+                        }}
+                      >
+                        +{activeSounds.size - 1} more
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Control buttons on the right */}
+              <View
                 style={{
-                  backgroundColor:
-                    activeSounds.size > 1 ? theme.primary : theme.card,
-                  borderWidth: 1,
-                  borderColor: theme.border,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  flexShrink: 0,
                 }}
-                iconColor={activeSounds.size > 1 ? "white" : theme.text}
-              />
-              <AnimatedControlButton
-                onPress={() => setTimerModalVisible(true)}
-                iconName="timer"
-                style={{
-                  backgroundColor: timerMinutes ? theme.primary : theme.card,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                }}
-                iconColor={timerMinutes ? "white" : theme.text}
-              />
-              <AnimatedControlButton
-                onPress={
-                  selectedSounds.size > 0 && activeSounds.size === 0
-                    ? undefined // Disable when loading
-                    : isPlaying
-                    ? pauseAllSounds
-                    : resumeAllSounds
-                }
-                iconName={
-                  selectedSounds.size > 0 && activeSounds.size === 0
-                    ? "hourglass" // Show loading icon when sounds are selected but not active
-                    : isPlaying
-                    ? "pause"
-                    : "play"
-                }
-                style={{
-                  opacity:
+              >
+                <AnimatedControlButton
+                  onPress={() => {
+                    if (!pro) {
+                      setPaywallOpen(true);
+                    } else {
+                      setMixerModalVisible(true);
+                    }
+                  }}
+                  iconName="options"
+                  size={20}
+                  style={{
+                    backgroundColor:
+                      activeSounds.size > 1 ? theme.primary : theme.card,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    width: 40,
+                    height: 40,
+                  }}
+                  iconColor={activeSounds.size > 1 ? "white" : theme.text}
+                />
+                <AnimatedControlButton
+                  onPress={() => setTimerModalVisible(true)}
+                  iconName="timer"
+                  size={20}
+                  style={{
+                    backgroundColor: timerMinutes ? theme.primary : theme.card,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    width: 40,
+                    height: 40,
+                  }}
+                  iconColor={timerMinutes ? "white" : theme.text}
+                />
+                <AnimatedControlButton
+                  onPress={
                     selectedSounds.size > 0 && activeSounds.size === 0
-                      ? 0.6
-                      : 1,
-                }}
-              />
-              <AnimatedControlButton
-                onPress={stopAllSounds}
-                iconName="stop"
-                style={{ backgroundColor: theme.error }}
-              />
+                      ? undefined // Disable when loading
+                      : isPlaying
+                      ? pauseAllSounds
+                      : resumeAllSounds
+                  }
+                  iconName={
+                    selectedSounds.size > 0 && activeSounds.size === 0
+                      ? "hourglass" // Show loading icon when sounds are selected but not active
+                      : isPlaying
+                      ? "pause"
+                      : "play"
+                  }
+                  size={20}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    backgroundColor: theme.primary,
+                    opacity:
+                      selectedSounds.size > 0 && activeSounds.size === 0
+                        ? 0.6
+                        : 1,
+                  }}
+                  iconColor="white"
+                />
+                <AnimatedControlButton
+                  onPress={stopAllSounds}
+                  iconName="stop"
+                  size={20}
+                  style={{
+                    backgroundColor: theme.error,
+                    width: 40,
+                    height: 40,
+                  }}
+                  iconColor="white"
+                />
+              </View>
             </View>
           </Animated.View>
         </>
@@ -2671,11 +2768,13 @@ function AnimatedControlButton({
   iconName,
   style = {},
   iconColor,
+  size = 24,
 }: any) {
   const { theme } = useTheme();
   const buttonScale = useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
+    if (!onPress) return;
     Animated.sequence([
       Animated.timing(buttonScale, {
         toValue: 0.9,
@@ -2701,8 +2800,9 @@ function AnimatedControlButton({
         ]}
         onPress={handlePress}
         activeOpacity={0.8}
+        disabled={!onPress}
       >
-        <Ionicons name={iconName} size={24} color={iconColor || "white"} />
+        <Ionicons name={iconName} size={size} color={iconColor || "white"} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -2850,11 +2950,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   controlButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
+    borderRadius: 20,
     elevation: 5,
   },
   volumeControl: {
