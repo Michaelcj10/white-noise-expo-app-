@@ -1017,6 +1017,11 @@ export default function SoundsScreen() {
     new Set([0, 1, 2])
   );
 
+  // Failed downloads state - track which sounds failed to download
+  const [failedDownloads, setFailedDownloads] = useState<Set<number>>(
+    new Set()
+  );
+
   // Snackbar state for favorites and download feedback - supports multiple toasts
   const [snackbars, setSnackbars] = useState<
     {
@@ -1448,23 +1453,47 @@ export default function SoundsScreen() {
           setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
         });
 
-        // Get source using sound cache (will use cached version if available)
-        const source = await soundCache.getSource(soundItem, true);
+        // Get source using sound cache - prioritize playback for mixer too
+        const source = await soundCache.getSource(soundItem, true, true);
 
         // Register callback for when download completes
         if (!soundCache.isDownloaded(soundItem.id)) {
-          soundCache.onDownloadComplete(soundItem.id, (completedId: number) => {
-            setDownloadedSounds((prev) => {
-              const newSet = new Set(prev);
-              newSet.add(completedId);
-              return newSet;
-            });
-            const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === completedId);
-            if (sound) {
-              showSnackbar(`${sound.name} saved for offline`);
-              Analytics.trackSoundDownloaded(completedId, sound.name);
+          soundCache.onDownloadComplete(
+            soundItem.id,
+            (completedId: number, success: boolean) => {
+              if (success) {
+                setDownloadedSounds((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.add(completedId);
+                  return newSet;
+                });
+                setFailedDownloads((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.delete(completedId);
+                  return newSet;
+                });
+                const sound = WHITE_NOISE_SOUNDS.find(
+                  (s) => s.id === completedId
+                );
+                if (sound) {
+                  showSnackbar(`${sound.name} saved for offline`);
+                  Analytics.trackSoundDownloaded(completedId, sound.name);
+                }
+              } else {
+                setFailedDownloads((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.add(completedId);
+                  return newSet;
+                });
+                const sound = WHITE_NOISE_SOUNDS.find(
+                  (s) => s.id === completedId
+                );
+                if (sound) {
+                  showSnackbar(`Failed to save ${sound.name} for offline`);
+                }
+              }
             }
-          });
+          );
         }
 
         // If sound was already downloaded, update UI immediately
@@ -1484,7 +1513,7 @@ export default function SoundsScreen() {
           {
             isLooping: true,
             volume: globalMuted ? 0 : 0.5,
-            shouldPlay: isPlaying,
+            shouldPlay: false, // Don't wait for initial play, we'll trigger it separately
             progressUpdateIntervalMillis: 1000, // Reduced frequency for better performance
             // Optimize for faster initial playback
             androidImplementation: "MediaPlayer",
@@ -1505,6 +1534,16 @@ export default function SoundsScreen() {
           },
           false // Don't download entire file before playing
         );
+
+        // Start playback immediately without waiting if audio is playing (non-blocking)
+        if (isPlaying) {
+          console.log(
+            `⏯️  Triggering playback for mixer sound ${soundItem.id}...`
+          );
+          newSound.playAsync().catch((err) => {
+            console.error(`Error playing mixer sound ${soundItem.id}:`, err);
+          });
+        }
 
         newActiveSounds.set(soundItem.id, {
           sound: newSound,
@@ -1604,33 +1643,71 @@ export default function SoundsScreen() {
     setSelectedSounds(new Set([soundItem.id]));
 
     // Stop all other sounds and play just this one
-    await stopAllSounds();
+    console.log(
+      `🎵 Switching to sound ${soundItem.id} (${soundItem.name}), stopping previous sounds...`
+    );
+
+    // Wait for cleanup to complete
+    console.log(`⏱️ Stopping all previous sounds...`);
+    await stopAllSounds().catch((err) =>
+      console.error("Error during cleanup:", err)
+    );
+
+    // Start new sound after cleanup is complete
+    console.log(`⚡ Starting playback of new sound...`);
     await playSingleSound(soundItem);
   };
 
   const playSingleSound = useCallback(
     async (soundItem: any) => {
       try {
+        console.log(
+          `🎶 Starting playback of sound ${soundItem.id} (${soundItem.name})...`
+        );
         // Show loading state
         setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
 
-        // Get source using sound cache (will use cached version if available)
-        const source = await soundCache.getSource(soundItem, true);
+        // Get source using sound cache - prioritize playback if not cached
+        const source = await soundCache.getSource(soundItem, true, true);
 
         // Register callback for when download completes
         if (!soundCache.isDownloaded(soundItem.id)) {
-          soundCache.onDownloadComplete(soundItem.id, (completedId: number) => {
-            setDownloadedSounds((prev) => {
-              const newSet = new Set(prev);
-              newSet.add(completedId);
-              return newSet;
-            });
-            const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === completedId);
-            if (sound) {
-              showSnackbar(`${sound.name} saved for offline`);
-              Analytics.trackSoundDownloaded(completedId, sound.name);
+          soundCache.onDownloadComplete(
+            soundItem.id,
+            (completedId: number, success: boolean) => {
+              if (success) {
+                setDownloadedSounds((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.add(completedId);
+                  return newSet;
+                });
+                setFailedDownloads((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.delete(completedId);
+                  return newSet;
+                });
+                const sound = WHITE_NOISE_SOUNDS.find(
+                  (s) => s.id === completedId
+                );
+                if (sound) {
+                  showSnackbar(`${sound.name} saved for offline`);
+                  Analytics.trackSoundDownloaded(completedId, sound.name);
+                }
+              } else {
+                setFailedDownloads((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.add(completedId);
+                  return newSet;
+                });
+                const sound = WHITE_NOISE_SOUNDS.find(
+                  (s) => s.id === completedId
+                );
+                if (sound) {
+                  showSnackbar(`Failed to save ${sound.name} for offline`);
+                }
+              }
             }
-          });
+          );
         }
 
         // If sound was already downloaded, update UI immediately
@@ -1650,7 +1727,7 @@ export default function SoundsScreen() {
           {
             isLooping: true,
             volume: globalMuted ? 0 : 0.5,
-            shouldPlay: true,
+            shouldPlay: false, // Don't wait for initial play, we'll trigger it separately
             progressUpdateIntervalMillis: 1000, // Reduced frequency for better performance
             // Optimize for faster initial playback
             androidImplementation: "MediaPlayer",
@@ -1671,6 +1748,12 @@ export default function SoundsScreen() {
           },
           false // Don't download entire file before playing
         );
+
+        // Start playback immediately without waiting (non-blocking)
+        console.log(`⏯️  Triggering playback for sound ${soundItem.id}...`);
+        newSound.playAsync().catch((err) => {
+          console.error(`Error playing sound ${soundItem.id}:`, err);
+        });
 
         // Handle playback status updates including interruptions
         newSound.setOnPlaybackStatusUpdate((status) => {
@@ -1698,17 +1781,18 @@ export default function SoundsScreen() {
 
         setActiveSounds(newActiveSounds);
         setIsPlaying(true);
+        console.log(
+          `✅ Sound ${soundItem.id} (${soundItem.name}) now playing!`
+        );
 
         // Clear selectedSounds since it's now active
         setSelectedSounds(new Set());
 
-        // Show notification for background playback (not paused)
-        try {
-          await showPlayingNotification(soundItem.name, false);
-        } catch (notifError) {
+        // Show notification for background playback asynchronously (non-blocking)
+        showPlayingNotification(soundItem.name, false).catch((notifError) => {
           // Silently ignore notification errors - they shouldn't crash playback
           console.log("📢 Notification skipped:", notifError);
-        }
+        });
       } catch (error) {
         // Clear loading and selected state on error
         setLoadingSounds((prev) => {
@@ -1791,6 +1875,12 @@ export default function SoundsScreen() {
   const stopAllSounds = useCallback(async () => {
     try {
       const soundCount = activeSounds.size;
+      if (soundCount > 0) {
+        const soundNames = Array.from(activeSounds.values())
+          .map((d) => `${d.soundItem.id} (${d.soundItem.name})`)
+          .join(", ");
+        console.log(`🛑 Stopping ${soundCount} sound(s): ${soundNames}...`);
+      }
 
       // Clear timer first
       if (timerIntervalRef.current) {
@@ -1802,8 +1892,12 @@ export default function SoundsScreen() {
       for (const [id, data] of activeSounds.entries()) {
         if (data?.sound) {
           try {
+            console.log(
+              `  ⏹️  Stopping sound ${id} (${data.soundItem.name})...`
+            );
             await data.sound.stopAsync();
             await data.sound.unloadAsync();
+            console.log(`  ✅ Sound ${id} stopped and unloaded`);
           } catch (error) {
             console.error(`Error stopping sound ${id}:`, error);
           }
@@ -1816,6 +1910,9 @@ export default function SoundsScreen() {
       setTimerMinutes(null);
       setTimerSeconds(0);
       setGlobalMuted(false);
+      if (soundCount > 0) {
+        console.log(`✅ All ${soundCount} sound(s) stopped and states reset`);
+      }
 
       // Track stop event if sounds were playing
       if (soundCount > 0) {
@@ -2548,7 +2645,7 @@ export default function SoundsScreen() {
               }}
             >
               {/* Sound info on the left */}
-              {activeSounds.size > 0 && (
+              {(activeSounds.size > 0 || selectedSounds.size > 0) && (
                 <View
                   style={{
                     flex: 1,
@@ -2557,27 +2654,49 @@ export default function SoundsScreen() {
                     gap: 12,
                   }}
                 >
-                  {/* Colored circle with icon */}
+                  {/* Colored circle with icon and loading spinner */}
                   <View
                     style={{
                       width: 44,
                       height: 44,
                       borderRadius: 22,
-                      backgroundColor: Array.from(activeSounds.values())[0]
-                        ?.soundItem?.color,
+                      backgroundColor:
+                        activeSounds.size > 0
+                          ? Array.from(activeSounds.values())[0]?.soundItem
+                              ?.color
+                          : WHITE_NOISE_SOUNDS.find(
+                              (s) => s.id === Array.from(selectedSounds)[0]
+                            )?.color,
                       justifyContent: "center",
                       alignItems: "center",
                       flexShrink: 0,
+                      position: "relative",
                     }}
                   >
-                    <Ionicons
-                      name={
-                        Array.from(activeSounds.values())[0]?.soundItem?.icon ||
-                        "musical-notes"
-                      }
-                      size={22}
-                      color="white"
-                    />
+                    {activeSounds.size > 0 &&
+                    !loadingSounds.has(
+                      Array.from(activeSounds.values())[0]?.soundItem?.id
+                    ) ? (
+                      // Playing - show icon
+                      <Ionicons
+                        name={
+                          Array.from(activeSounds.values())[0]?.soundItem
+                            ?.icon || "musical-notes"
+                        }
+                        size={22}
+                        color="white"
+                      />
+                    ) : selectedSounds.size > 0 ? (
+                      // Loading - show spinner
+                      <ActivityIndicator
+                        size="small"
+                        color="white"
+                        style={{ position: "absolute" }}
+                      />
+                    ) : (
+                      // Default icon
+                      <Ionicons name="musical-notes" size={22} color="white" />
+                    )}
                   </View>
 
                   {/* Sound name and count */}
@@ -2591,7 +2710,13 @@ export default function SoundsScreen() {
                         marginBottom: 2,
                       }}
                     >
-                      {Array.from(activeSounds.values())[0]?.soundItem?.name}
+                      {activeSounds.size > 0
+                        ? Array.from(activeSounds.values())[0]?.soundItem?.name
+                        : selectedSounds.size > 0
+                        ? WHITE_NOISE_SOUNDS.find(
+                            (s) => s.id === Array.from(selectedSounds)[0]
+                          )?.name
+                        : "No sound"}
                     </Text>
                     {activeSounds.size > 1 && (
                       <Text
@@ -2602,6 +2727,17 @@ export default function SoundsScreen() {
                         }}
                       >
                         +{activeSounds.size - 1} more
+                      </Text>
+                    )}
+                    {activeSounds.size === 0 && selectedSounds.size > 0 && (
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: theme.primary,
+                          fontWeight: "500",
+                        }}
+                      >
+                        Loading...
                       </Text>
                     )}
                   </View>
