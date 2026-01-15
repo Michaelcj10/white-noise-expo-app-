@@ -1,7 +1,7 @@
 // utils/soundCache.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as FileSystem from "expo-file-system";
-import { Directory, File, Paths } from "expo-file-system";
+import { Directory, Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 
 const CACHE_DIR_NAME = "sound_cache";
@@ -26,6 +26,10 @@ class SoundCacheManager {
   > = new Map();
   private maxDownloadDuration = 45000; // 45 seconds max per download
 
+  // Freemium enforcement
+  private MAX_FREE_DOWNLOADS = 1; // Free users can only save 1 sound
+  private isProUser = false; // Will be set by app based on subscription status
+
   async initialize() {
     if (this.initialized) return;
 
@@ -41,9 +45,20 @@ class SoundCacheManager {
       this.cacheDir = new Directory(Paths.cache, CACHE_DIR_NAME);
 
       // Check if directory exists, create if not
-      if (!this.cacheDir.exists) {
-        await this.cacheDir.create();
-        console.log("📦 Sound cache directory created");
+      try {
+        const dirInfo = await FileSystem.getInfoAsync(this.cacheDir.uri);
+        if (!dirInfo.exists) {
+          await this.cacheDir.create();
+          console.log("📦 Sound cache directory created");
+        }
+      } catch (err) {
+        // Try to create it anyway
+        try {
+          await this.cacheDir.create();
+          console.log("📦 Sound cache directory created");
+        } catch (createErr) {
+          console.error("📦 Could not create cache directory:", createErr);
+        }
       }
 
       // Load cached sounds metadata from AsyncStorage
@@ -54,8 +69,8 @@ class SoundCacheManager {
         // Verify each cached file still exists
         for (const cached of cachedSoundsArray) {
           try {
-            const file = new File(cached.localUri);
-            if (file.exists) {
+            const fileInfo = await FileSystem.getInfoAsync(cached.localUri);
+            if (fileInfo.exists && !fileInfo.isDirectory) {
               this.downloadedSounds.set(cached.id, cached);
             } else {
               console.log(
@@ -143,8 +158,8 @@ class SoundCacheManager {
     if (this.downloadedSounds.has(soundId)) {
       const cached = this.downloadedSounds.get(soundId)!;
       try {
-        const file = new File(cached.localUri);
-        if (file.exists) {
+        const fileInfo = await FileSystem.getInfoAsync(cached.localUri);
+        if (fileInfo.exists && !fileInfo.isDirectory) {
           console.log(`📦 Sound ${soundId} already cached`);
           return cached.localUri;
         }
@@ -196,7 +211,7 @@ class SoundCacheManager {
 
       // Verify file exists after download
       const fileInfo = await FileSystem.getInfoAsync(filePath);
-      if (!fileInfo.exists || !fileInfo.isDirectory === false) {
+      if (!fileInfo.exists || fileInfo.isDirectory === true) {
         throw new Error(`Downloaded file does not exist at ${filePath}`);
       }
 
@@ -253,26 +268,68 @@ class SoundCacheManager {
   }
 
   // Explicitly trigger a download - used by "Save for Offline" button
-  async initiateDownload(soundItem: any): Promise<boolean> {
+  async initiateDownload(
+    soundItem: any,
+    isPro: boolean = false
+  ): Promise<boolean> {
+    console.log(
+      `📦 [initiateDownload] Starting for sound ${soundItem.id} - ${soundItem.name}, isPro: ${isPro}`
+    );
+
+    // Free users can download any non-premium sounds
+    // Pro users can download everything
+    const isFreeDownloadable = !soundItem.premium;
+
+    if (!isPro && !isFreeDownloadable) {
+      console.log(
+        `📦 [initiateDownload] Download blocked - only pro users can download sound ${soundItem.id}`
+      );
+      return false;
+    }
+
+    // Update pro status for this download
+    this.isProUser = isPro;
+
     if (this.downloadedSounds.has(soundItem.id)) {
-      console.log(`📦 Sound ${soundItem.id} already downloaded`);
+      console.log(
+        `📦 [initiateDownload] Sound ${soundItem.id} already downloaded`
+      );
       return true;
     }
 
     if (this.downloadQueue.has(soundItem.id)) {
-      console.log(`📦 Sound ${soundItem.id} already downloading`);
+      console.log(
+        `📦 [initiateDownload] Sound ${soundItem.id} already downloading`
+      );
       return false; // Already in progress
     }
 
-    console.log(`📦 User initiated download for sound ${soundItem.id}`);
+    console.log(
+      `📦 [initiateDownload] Initiating actual download for ${soundItem.id} from ${soundItem.source}`
+    );
 
     try {
       const result = await this.downloadSound(soundItem.id, soundItem.source);
-      return result !== null;
+      const success = result !== null;
+      console.log(
+        `📦 [initiateDownload] Download result for ${soundItem.id}: ${
+          success ? "SUCCESS" : "FAILED"
+        }`
+      );
+      return success;
     } catch (error) {
-      console.error(`📦 Download failed for sound ${soundItem.id}:`, error);
+      console.error(
+        `📦 [initiateDownload] Exception downloading sound ${soundItem.id}:`,
+        error
+      );
       return false;
     }
+  }
+
+  // Set pro status for freemium enforcement
+  setProUser(isPro: boolean) {
+    this.isProUser = isPro;
+    console.log(`📦 Pro user status updated: ${isPro}`);
   }
 
   onDownloadComplete(
@@ -313,20 +370,20 @@ class SoundCacheManager {
 
   private verifyCacheFile(soundId: number, cachedUri: string): void {
     // Fire-and-forget file verification
-    try {
-      const file = new File(cachedUri);
-      if (!file.exists) {
-        console.log(
-          `📦 Sound ${soundId}: Cache file no longer exists, removing`
-        );
-        this.downloadedSounds.delete(soundId);
-        this.saveCacheMetadata().catch((err) =>
-          console.log(`📦 Error saving cache metadata: ${err}`)
-        );
+    (async () => {
+      try {
+        const fileInfo = await FileSystem.getInfoAsync(cachedUri);
+        if (!fileInfo.exists || fileInfo.isDirectory) {
+          console.log(
+            `📦 Sound ${soundId}: Cache file no longer exists, removing`
+          );
+          this.downloadedSounds.delete(soundId);
+          await this.saveCacheMetadata();
+        }
+      } catch (err) {
+        // Ignore errors
       }
-    } catch (err) {
-      // Ignore errors
-    }
+    })();
   }
 
   private checkAndCacheInBackground(
@@ -344,8 +401,8 @@ class SoundCacheManager {
           const found = cachedSoundsArray.find((s) => s.id === soundItem.id);
           if (found) {
             try {
-              const file = new File(found.localUri);
-              if (file.exists) {
+              const fileInfo = await FileSystem.getInfoAsync(found.localUri);
+              if (fileInfo.exists && !fileInfo.isDirectory) {
                 // Found a newly downloaded file, update memory cache
                 console.log(
                   `✅ Sound ${soundItem.id}: Background check found cached file`
@@ -376,7 +433,7 @@ class SoundCacheManager {
 
   async getSource(
     soundItem: any,
-    autoDownload: boolean = true,
+    autoDownload: boolean = false,
     prioritize: boolean = false
   ): Promise<any> {
     // For local sounds, return the required asset directly
@@ -418,75 +475,19 @@ class SoundCacheManager {
     return { uri: soundItem.source };
   }
 
-  private verifyCacheFile(soundId: number, cachedUri: string): void {
-    // Fire-and-forget file verification
-    try {
-      const file = new File(cachedUri);
-      if (!file.exists) {
-        console.log(
-          `📦 Sound ${soundId}: Cache file no longer exists, removing`
-        );
-        this.downloadedSounds.delete(soundId);
-        this.saveCacheMetadata().catch((err) =>
-          console.log(`📦 Error saving cache metadata: ${err}`)
-        );
-      }
-    } catch (err) {
-      // Ignore errors
-    }
-  }
-
-  private checkAndCacheInBackground(
-    soundItem: any,
-    autoDownload: boolean,
-    prioritize: boolean
-  ): void {
-    // Fire-and-forget background cache checking
-    (async () => {
-      try {
-        // Check AsyncStorage for recently downloaded files
-        const stored = await AsyncStorage.getItem(DOWNLOADED_SOUNDS_KEY);
-        if (stored) {
-          const cachedSoundsArray: CachedSound[] = JSON.parse(stored);
-          const found = cachedSoundsArray.find((s) => s.id === soundItem.id);
-          if (found) {
-            try {
-              const file = new File(found.localUri);
-              if (file.exists) {
-                // Found a newly downloaded file, update memory cache
-                console.log(
-                  `✅ Sound ${soundItem.id}: Background check found cached file`
-                );
-                this.downloadedSounds.set(soundItem.id, found);
-                return; // Don't need to download
-              }
-            } catch (err) {
-              // File doesn't exist
-            }
-          }
-        }
-
-        // No cached file found, initiate background download if needed
-        if (autoDownload && !this.downloadQueue.has(soundItem.id)) {
-          console.log(
-            `📦 Sound ${soundItem.id}: Starting background cache download...`
-          );
-          this.downloadSound(soundItem.id, soundItem.source).catch((err) => {
-            console.log(`📦 Sound ${soundItem.id}: Download failed: ${err}`);
-          });
-        }
-      } catch (err) {
-        // Ignore all errors in background task
-      }
-    })();
-  }
-
   async clearCache(): Promise<void> {
     try {
-      if (this.cacheDir && this.cacheDir.exists) {
-        await this.cacheDir.delete();
-        // Recreate directory
-        await this.cacheDir.create();
+      if (this.cacheDir) {
+        try {
+          const dirInfo = await FileSystem.getInfoAsync(this.cacheDir.uri);
+          if (dirInfo.exists) {
+            await this.cacheDir.delete();
+            // Recreate directory
+            await this.cacheDir.create();
+          }
+        } catch (err) {
+          // Directory might not exist, that's ok
+        }
       }
 
       this.downloadedSounds.clear();
@@ -503,9 +504,8 @@ class SoundCacheManager {
       let totalSize = 0;
       for (const cached of this.downloadedSounds.values()) {
         try {
-          const file = new File(cached.localUri);
-          // Use size property directly if available
-          if (file.exists) {
+          const fileInfo = await FileSystem.getInfoAsync(cached.localUri);
+          if (fileInfo.exists && !fileInfo.isDirectory) {
             // File size calculation would need additional API - for now return count
             totalSize += 1;
           }
@@ -522,6 +522,23 @@ class SoundCacheManager {
 
   getDownloadedSoundIds(): number[] {
     return Array.from(this.downloadedSounds.keys());
+  }
+
+  // Check if user can download more sounds (respects freemium limits)
+  canDownloadMore(isPro: boolean = false): boolean {
+    if (isPro) return true; // Pro users can download unlimited
+    return this.downloadedSounds.size < this.MAX_FREE_DOWNLOADS;
+  }
+
+  // Get remaining downloads for free users
+  getRemainingDownloads(isPro: boolean = false): number {
+    if (isPro) return Infinity;
+    return Math.max(0, this.MAX_FREE_DOWNLOADS - this.downloadedSounds.size);
+  }
+
+  // Get list of downloaded sounds
+  getDownloadedSounds(): CachedSound[] {
+    return Array.from(this.downloadedSounds.values());
   }
 }
 

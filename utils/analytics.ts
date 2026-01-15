@@ -243,7 +243,13 @@ class AnalyticsService {
 
   // Premium/Paywall events
   trackPaywallViewed(
-    trigger: "premium_sound" | "mixer" | "banner" | "settings" | "favorite"
+    trigger:
+      | "premium_sound"
+      | "mixer"
+      | "banner"
+      | "settings"
+      | "favorite"
+      | "offline_limit"
   ) {
     this.track("Paywall Viewed", {
       trigger_source: trigger,

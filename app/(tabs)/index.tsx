@@ -26,7 +26,6 @@ import {
   AppState,
   Easing,
   Modal,
-  PanResponder,
   Platform,
   ScrollView,
   StatusBar,
@@ -48,10 +47,8 @@ import {
 
 /* ---------- Platform helpers ---------- */
 const isWeb = Platform.OS === "web";
-const isAndroid = Platform.OS === "android";
 
 /* ---------- Storage (web-safe) ---------- */
-const ENTITLEMENT_KEY = "entitlement_pro";
 const FAVORITES_KEY = "favorite_sound_ids";
 
 const Storage = {
@@ -97,135 +94,12 @@ function MixerModal({
   pro: boolean;
   isPlaying: boolean;
 }) {
-  const [localVolumes, setLocalVolumes] = useState<Map<number, number>>(
-    new Map()
-  );
-
   useEffect(() => {
     const volumes = new Map<number, number>();
     activeSounds.forEach((data, id) => {
       volumes.set(id, data.volume);
     });
-    setLocalVolumes(volumes);
   }, [activeSounds]);
-
-  const handleVolumeChange = (soundId: number, value: number) => {
-    const newVolumes = new Map(localVolumes);
-    newVolumes.set(soundId, value);
-    setLocalVolumes(newVolumes);
-    onVolumeChange(soundId, value);
-  };
-
-  // Volume Slider Component with PanResponder
-  const VolumeSlider = ({
-    soundId,
-    soundItem,
-    volume,
-  }: {
-    soundId: number;
-    soundItem: any;
-    volume: number;
-  }) => {
-    const [sliderWidth, setSliderWidth] = useState(0);
-    const [isDragging, setIsDragging] = useState(false);
-
-    const handleSliderPress = (evt: any) => {
-      if (sliderWidth > 0) {
-        const locationX = evt.nativeEvent.locationX;
-        const newValue = Math.max(0, Math.min(1, locationX / sliderWidth));
-        handleVolumeChange(soundId, newValue);
-      }
-    };
-
-    const panResponder = useRef(
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: () => {
-          setIsDragging(true);
-        },
-        onPanResponderMove: (evt, gestureState) => {
-          if (sliderWidth > 0) {
-            const locationX = evt.nativeEvent.locationX;
-            const newValue = Math.max(0, Math.min(1, locationX / sliderWidth));
-            handleVolumeChange(soundId, newValue);
-          }
-        },
-        onPanResponderRelease: () => {
-          setIsDragging(false);
-        },
-      })
-    ).current;
-
-    return (
-      <View
-        style={{ flexDirection: "row", alignItems: "center", paddingLeft: 52 }}
-      >
-        <Ionicons name="volume-low" size={16} color={theme.textSecondary} />
-        <View
-          style={{ flex: 1, marginHorizontal: 8 }}
-          onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={handleSliderPress}
-            style={{
-              height: 32,
-              justifyContent: "center",
-            }}
-            {...panResponder.panHandlers}
-          >
-            <View
-              style={{
-                height: 4,
-                backgroundColor: theme.border,
-                borderRadius: 2,
-                overflow: "hidden",
-              }}
-            >
-              <View
-                style={{
-                  width: `${volume * 100}%`,
-                  height: "100%",
-                  backgroundColor: soundItem.color,
-                }}
-              />
-            </View>
-            <View
-              style={{
-                position: "absolute",
-                width: 24,
-                height: 24,
-                borderRadius: 12,
-                backgroundColor: "white",
-                borderWidth: 3,
-                borderColor: soundItem.color,
-                left: `${volume * 100}%`,
-                marginLeft: -12,
-                elevation: isDragging ? 5 : 3,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.25,
-                shadowRadius: isDragging ? 4 : 2,
-                transform: [{ scale: isDragging ? 1.2 : 1 }],
-              }}
-            />
-          </TouchableOpacity>
-        </View>
-        <Ionicons name="volume-high" size={16} color={theme.textSecondary} />
-        <Text
-          style={{
-            marginLeft: 8,
-            color: theme.textSecondary,
-            fontSize: 12,
-            width: 35,
-            textAlign: "right",
-          }}
-        >
-          {Math.round(volume * 100)}%
-        </Text>
-      </View>
-    );
-  };
 
   return (
     <Modal
@@ -280,11 +154,25 @@ function MixerModal({
             Mix multiple sounds together
           </Text>
 
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onClose();
+            }}
+            style={{
+              padding: 12,
+              alignItems: "center",
+              marginBottom: 12,
+              backgroundColor: theme.border,
+              borderRadius: 12,
+            }}
+          >
+            <Text style={{ color: theme.text, fontWeight: "600" }}>Done</Text>
+          </TouchableOpacity>
+
           <ScrollView showsVerticalScrollIndicator={false}>
             {WHITE_NOISE_SOUNDS.map((soundItem) => {
               const isActive = activeSounds.has(soundItem.id);
-              const soundData = activeSounds.get(soundItem.id);
-              const volume = localVolumes.get(soundItem.id) || 0.5;
               const isLocked = soundItem.premium && !pro;
 
               // First sound in the map is the original sound that started playing
@@ -423,185 +311,6 @@ function MixerModal({
               );
             })}
           </ScrollView>
-
-          <TouchableOpacity
-            onPress={onClose}
-            style={{
-              padding: 12,
-              alignItems: "center",
-              marginTop: 16,
-              backgroundColor: theme.border,
-              borderRadius: 12,
-            }}
-          >
-            <Text style={{ color: theme.text, fontWeight: "600" }}>Done</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-/* ---------- Sound Options Modal ---------- */
-function SoundOptionsModal({
-  visible,
-  onClose,
-  theme,
-  sound,
-  onPlay,
-  onMixerPress,
-  onTimerPress,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  theme: any;
-  sound: any;
-  onPlay: () => void;
-  onMixerPress: () => void;
-  onTimerPress: () => void;
-}) {
-  if (!sound) return null;
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "#0006",
-          justifyContent: "flex-end",
-        }}
-      >
-        <View
-          style={{
-            backgroundColor: theme.surface,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            padding: 24,
-            borderTopWidth: 1,
-            borderColor: theme.border,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginBottom: 20,
-            }}
-          >
-            <View
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: sound.color,
-                justifyContent: "center",
-                alignItems: "center",
-                marginRight: 12,
-              }}
-            >
-              <Ionicons name={sound.icon} size={20} color="white" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{ fontSize: 20, fontWeight: "600", color: theme.text }}
-              >
-                {sound.name}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: theme.textSecondary,
-                  marginTop: 2,
-                }}
-              >
-                {sound.description}
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            onPress={() => {
-              onPlay();
-              onClose();
-            }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              padding: 16,
-              backgroundColor: theme.primary,
-              borderRadius: 12,
-              marginBottom: 12,
-            }}
-          >
-            <Ionicons name="play" size={20} color="white" />
-            <Text style={{ color: "white", marginLeft: 12, fontWeight: "600" }}>
-              Play Sound
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              onMixerPress();
-              onClose();
-            }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              padding: 16,
-              backgroundColor: theme.card,
-              borderRadius: 12,
-              marginBottom: 12,
-            }}
-          >
-            <Ionicons name="options" size={20} color={theme.text} />
-            <Text
-              style={{
-                color: theme.text,
-                marginLeft: 12,
-                fontWeight: "600",
-              }}
-            >
-              Mix with Other Sounds
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              onTimerPress();
-              onClose();
-            }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              padding: 16,
-              backgroundColor: theme.card,
-              borderRadius: 12,
-              marginBottom: 12,
-            }}
-          >
-            <Ionicons name="timer" size={20} color={theme.text} />
-            <Text
-              style={{
-                color: theme.text,
-                marginLeft: 12,
-                fontWeight: "600",
-              }}
-            >
-              Set Timer
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={onClose}
-            style={{
-              padding: 16,
-              alignItems: "center",
-              backgroundColor: theme.border,
-              borderRadius: 12,
-            }}
-          >
-            <Text style={{ color: theme.text, fontWeight: "500" }}>Cancel</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -634,7 +343,7 @@ function TimerModal({
     setIsVisible(false);
     setTimeout(() => {
       onClose();
-    }, 300); // Wait for slide animation
+    }, 300);
   };
 
   const handleSelectTimer = (value: number | null) => {
@@ -679,6 +388,22 @@ function TimerModal({
             maxHeight: "70%",
           }}
         >
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              handleClose();
+            }}
+            style={{
+              padding: 12,
+              alignItems: "center",
+              marginBottom: 12,
+              backgroundColor: theme.border,
+              borderRadius: 12,
+            }}
+          >
+            <Text style={{ color: theme.text, fontWeight: "600" }}>Done</Text>
+          </TouchableOpacity>
+
           <View
             style={{
               flexDirection: "row",
@@ -696,19 +421,6 @@ function TimerModal({
             >
               Sleep Timer
             </Text>
-            <TouchableOpacity
-              onPress={onClose}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: theme.border,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Ionicons name="close" size={20} color={theme.text} />
-            </TouchableOpacity>
           </View>
           <Text
             style={{
@@ -773,19 +485,6 @@ function TimerModal({
               </TouchableOpacity>
             ))}
           </ScrollView>
-
-          <TouchableOpacity
-            onPress={handleClose}
-            style={{
-              padding: 12,
-              alignItems: "center",
-              marginTop: 16,
-              backgroundColor: theme.border,
-              borderRadius: 12,
-            }}
-          >
-            <Text style={{ color: theme.text, fontWeight: "600" }}>Cancel</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -869,90 +568,7 @@ function EmptyPlayerState({ theme }: { theme: any }) {
   );
 }
 
-/* ================== SOUND VISUALIZER ================== */
-function SoundVisualizer({
-  isPlaying,
-  activeSoundsCount,
-}: {
-  isPlaying: boolean;
-  activeSoundsCount: number;
-}) {
-  const { theme } = useTheme();
-  const bars = useRef(
-    Array.from({ length: 20 }, () => new Animated.Value(0.3))
-  ).current;
-
-  useEffect(() => {
-    if (isPlaying && activeSoundsCount > 0) {
-      const animations = bars.map((bar, index) => {
-        return Animated.loop(
-          Animated.sequence([
-            Animated.timing(bar, {
-              toValue: Math.random() * 0.7 + 0.3,
-              duration: 300 + Math.random() * 400,
-              easing: Easing.inOut(Easing.ease),
-              useNativeDriver: true,
-            }),
-            Animated.timing(bar, {
-              toValue: Math.random() * 0.5 + 0.2,
-              duration: 300 + Math.random() * 400,
-              easing: Easing.inOut(Easing.ease),
-              useNativeDriver: true,
-            }),
-          ])
-        );
-      });
-
-      animations.forEach((anim) => anim.start());
-
-      return () => {
-        animations.forEach((anim) => anim.stop());
-      };
-    } else {
-      bars.forEach((bar) => {
-        Animated.timing(bar, {
-          toValue: 0.1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-      });
-    }
-  }, [isPlaying, activeSoundsCount, bars]);
-
-  return (
-    <View
-      style={{
-        height: 60,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 3,
-        paddingHorizontal: 20,
-        marginBottom: 12,
-      }}
-    >
-      {bars.map((bar, index) => (
-        <Animated.View
-          key={index}
-          style={{
-            width: 3,
-            height: "100%",
-            backgroundColor: theme.primary,
-            borderRadius: 2,
-            opacity: 0.7,
-            transform: [
-              {
-                scaleY: bar,
-              },
-            ],
-          }}
-        />
-      ))}
-    </View>
-  );
-}
-
-/* ================== YOUR SCREEN (with gate) ================== */
+/* ================== MAIN SCREEN ================== */
 export default function SoundsScreen() {
   const { theme, themeMode } = useTheme();
   const { backgroundPlayEnabled } = useBackgroundPlay();
@@ -965,8 +581,6 @@ export default function SoundsScreen() {
   const { setScrollViewRef } = useScroll();
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
-
-  const [focusKey, setFocusKey] = useState(0);
 
   // Multiple sounds support
   const [activeSounds, setActiveSounds] = useState<
@@ -983,12 +597,8 @@ export default function SoundsScreen() {
   >(new Map());
 
   const [selectedCategory, setSelectedCategory] = useState<
-    SoundCategory | "Favourites"
+    SoundCategory | "Favourites" | "Downloaded"
   >(SOUND_CATEGORIES.ALL);
-
-  // Animation for category tab indicator
-  const tabIndicatorPosition = useRef(new Animated.Value(0)).current;
-  const tabIndicatorWidth = useRef(new Animated.Value(100)).current;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [globalMuted, setGlobalMuted] = useState(false);
@@ -1017,8 +627,8 @@ export default function SoundsScreen() {
     new Set([0, 1, 2])
   );
 
-  // Failed downloads state - track which sounds failed to download
-  const [failedDownloads, setFailedDownloads] = useState<Set<number>>(
+  // Downloading sounds state - track which sounds are currently being downloaded
+  const [downloadingStates, setDownloadingStates] = useState<Set<number>>(
     new Set()
   );
 
@@ -1055,7 +665,6 @@ export default function SoundsScreen() {
 
   const configureAudioSession = useCallback(async () => {
     try {
-      // On web, setAudioModeAsync is a no-op; guard just in case
       if (Audio?.setAudioModeAsync) {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
@@ -1101,7 +710,9 @@ export default function SoundsScreen() {
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Handle app state changes (safe on web)
+  }, []);
+
+  // Handle app state changes
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === "background" || nextAppState === "inactive") {
@@ -1123,6 +734,7 @@ export default function SoundsScreen() {
       handleAppStateChange
     );
     return () => subscription?.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backgroundPlayEnabled, activeSounds, isPlaying]);
 
   // Timer logic
@@ -1136,11 +748,8 @@ export default function SoundsScreen() {
         setTimerSeconds((prev) => {
           const newSeconds = prev - 1;
           if (newSeconds <= 0) {
-            // Timer finished - stop all sounds
+            // Timer finished - schedule stop for next render cycle
             Analytics.trackTimerCompleted(timerMinutes);
-            setTimeout(() => {
-              stopAllSounds();
-            }, 0);
             return 0;
           }
           return newSeconds;
@@ -1153,7 +762,18 @@ export default function SoundsScreen() {
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [timerMinutes, isPlaying]);
+  }, [timerMinutes, isPlaying, timerSeconds]);
+
+  // Handle timer completion
+  useEffect(() => {
+    if (timerMinutes !== null && timerSeconds === 0 && isPlaying) {
+      // Timer completed - stop all sounds
+      const timeoutId = setTimeout(() => {
+        stopAllSounds();
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [timerSeconds, timerMinutes, isPlaying, stopAllSounds]);
 
   // Sync main playing state to context for quick play button
   useEffect(() => {
@@ -1166,10 +786,6 @@ export default function SoundsScreen() {
         const soundNames = Array.from(activeSounds.values())
           .map((data) => data.soundItem?.name || "Unknown")
           .join(", ");
-
-        // This would require expo-av's Audio.setNowPlayingInfo (if available)
-        // Since expo-av is being deprecated, this is a placeholder for future implementation
-        // with expo-audio or react-native-track-player
         console.log("Now Playing:", soundNames);
       }
     } catch (error) {
@@ -1178,10 +794,9 @@ export default function SoundsScreen() {
   };
 
   const refreshSoundState = useCallback(async () => {
-    const newActiveSounds = new Map(activeSounds);
     let hasPlaying = false;
 
-    for (const [id, data] of activeSounds.entries()) {
+    for (const [, data] of activeSounds.entries()) {
       try {
         const status = await data.sound.getStatusAsync();
         if (status.isLoaded && status.isPlaying) {
@@ -1195,38 +810,20 @@ export default function SoundsScreen() {
     setIsPlaying(hasPlaying);
   }, [activeSounds]);
 
-  // Handle global mute/unmute
-  const toggleGlobalMute = async () => {
-    const newMuted = !globalMuted;
-    setGlobalMuted(newMuted);
-
-    const newActiveSounds = new Map(activeSounds);
-    for (const [id, data] of newActiveSounds.entries()) {
-      if (data?.sound) {
-        try {
-          await data.sound.setVolumeAsync(newMuted ? 0 : data.volume);
-          data.isMuted = newMuted;
-        } catch (error) {
-          console.error(`Error toggling mute for sound ${id}:`, error);
-        }
-      }
-    }
-    setActiveSounds(newActiveSounds);
-  };
-
   useEffect(() => {
-    // No animations - just cleanup
     return () => {
       // Cleanup all sounds on unmount
       activeSounds.forEach((data) => {
         data.sound.unloadAsync();
       });
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update lock screen info when active sounds change
   useEffect(() => {
     updateNowPlayingInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSounds, isPlaying]);
 
   useEffect(() => {
@@ -1270,7 +867,6 @@ export default function SoundsScreen() {
         const stored = await Storage.getItem(FAVORITES_KEY);
         if (stored) {
           const ids = JSON.parse(stored);
-          // Validate that parsed data is an array
           if (Array.isArray(ids)) {
             setFavorites(new Set(ids));
           } else {
@@ -1280,10 +876,8 @@ export default function SoundsScreen() {
         }
       } catch (error) {
         console.error("Error loading favorites:", error);
-        // Reset to empty set on parse error
         setFavorites(new Set());
       } finally {
-        // Turn off initial loading after a brief delay to show skeleton
         setTimeout(() => setIsInitialLoad(false), 800);
       }
     };
@@ -1298,7 +892,6 @@ export default function SoundsScreen() {
           const stored = await Storage.getItem(FAVORITES_KEY);
           if (stored) {
             const ids = JSON.parse(stored);
-            // Validate that parsed data is an array
             if (Array.isArray(ids)) {
               setFavorites(new Set(ids));
             } else {
@@ -1310,7 +903,6 @@ export default function SoundsScreen() {
           }
         } catch (error) {
           console.error("Error loading favorites:", error);
-          // Reset to empty set on parse error
           setFavorites(new Set());
         }
       };
@@ -1330,11 +922,9 @@ export default function SoundsScreen() {
 
   // Toggle favorite
   const toggleFavorite = (soundId: number) => {
-    // Check if sound is premium
     const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === soundId);
     const isPremium = sound?.premium || false;
 
-    // Only require pro for premium sounds
     if (isPremium && !pro) {
       Analytics.trackPaywallViewed("favorite");
       setPaywallOpen(true);
@@ -1342,24 +932,18 @@ export default function SoundsScreen() {
     }
 
     const newFavorites = new Set(favorites);
-    const isAdding = !newFavorites.has(soundId);
 
     if (newFavorites.has(soundId)) {
       newFavorites.delete(soundId);
       showSnackbar("Removed from favorites");
-
-      // Track favorite removed
       Analytics.trackFavoriteRemoved(soundId, sound?.name || "Unknown");
 
-      // If we're viewing Favourites and this was the last one, switch to All
       if (selectedCategory === "Favourites" && newFavorites.size === 0) {
         setSelectedCategory(SOUND_CATEGORIES.ALL);
       }
     } else {
       newFavorites.add(soundId);
       showSnackbar("Added to favorites");
-
-      // Track favorite added
       Analytics.trackFavoriteAdded(
         soundId,
         sound?.name || "Unknown",
@@ -1377,9 +961,7 @@ export default function SoundsScreen() {
     const opacity = new Animated.Value(0);
     const translateY = new Animated.Value(0);
 
-    // Add new snackbar to the stack
     setSnackbars((prev) => {
-      // Animate existing snackbars down to make room
       prev.forEach((snackbar, index) => {
         Animated.timing(snackbar.translateY, {
           toValue: (index + 1) * 70,
@@ -1391,7 +973,6 @@ export default function SoundsScreen() {
       return [...prev, { id, message, opacity, translateY }];
     });
 
-    // Animate in
     Animated.sequence([
       Animated.timing(opacity, {
         toValue: 1,
@@ -1405,10 +986,8 @@ export default function SoundsScreen() {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // Remove snackbar and animate remaining ones up
       setSnackbars((prev) => {
         const filtered = prev.filter((s) => s.id !== id);
-        // Animate remaining snackbars to their new positions
         filtered.forEach((snackbar, index) => {
           Animated.timing(snackbar.translateY, {
             toValue: index * 70,
@@ -1426,10 +1005,11 @@ export default function SoundsScreen() {
     const newActiveSounds = new Map(activeSounds);
 
     if (newActiveSounds.has(soundItem.id)) {
-      // Remove sound
+      // Sound is active - remove it
       const data = newActiveSounds.get(soundItem.id);
       if (data?.sound) {
         try {
+          data.sound.setOnPlaybackStatusUpdate(null);
           await data.sound.stopAsync();
           await data.sound.unloadAsync();
         } catch (error) {
@@ -1437,26 +1017,14 @@ export default function SoundsScreen() {
         }
       }
       newActiveSounds.delete(soundItem.id);
-
-      // Remove from selected sounds too
-      setSelectedSounds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(soundItem.id);
-        return newSet;
-      });
+      setActiveSounds(newActiveSounds);
     } else {
-      // Add sound
+      // Sound is not active - add it
       try {
-        // Batch state updates to reduce re-renders
-        React.startTransition(() => {
-          setSelectedSounds((prev) => new Set(prev).add(soundItem.id));
-          setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
-        });
+        setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
 
-        // Get source using sound cache - prioritize playback for mixer too
         const source = await soundCache.getSource(soundItem, true, true);
 
-        // Register callback for when download completes
         if (!soundCache.isDownloaded(soundItem.id)) {
           soundCache.onDownloadComplete(
             soundItem.id,
@@ -1467,11 +1035,6 @@ export default function SoundsScreen() {
                   newSet.add(completedId);
                   return newSet;
                 });
-                setFailedDownloads((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.delete(completedId);
-                  return newSet;
-                });
                 const sound = WHITE_NOISE_SOUNDS.find(
                   (s) => s.id === completedId
                 );
@@ -1480,11 +1043,6 @@ export default function SoundsScreen() {
                   Analytics.trackSoundDownloaded(completedId, sound.name);
                 }
               } else {
-                setFailedDownloads((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.add(completedId);
-                  return newSet;
-                });
                 const sound = WHITE_NOISE_SOUNDS.find(
                   (s) => s.id === completedId
                 );
@@ -1496,7 +1054,6 @@ export default function SoundsScreen() {
           );
         }
 
-        // If sound was already downloaded, update UI immediately
         if (
           soundCache.isDownloaded(soundItem.id) &&
           !downloadedSounds.has(soundItem.id)
@@ -1513,13 +1070,11 @@ export default function SoundsScreen() {
           {
             isLooping: true,
             volume: globalMuted ? 0 : 0.5,
-            shouldPlay: false, // Don't wait for initial play, we'll trigger it separately
-            progressUpdateIntervalMillis: 1000, // Reduced frequency for better performance
-            // Optimize for faster initial playback
+            shouldPlay: false,
+            progressUpdateIntervalMillis: 1000,
             androidImplementation: "MediaPlayer",
           },
           (status) => {
-            // Remove loading state once sound can play
             if (
               status.isLoaded &&
               status.durationMillis &&
@@ -1532,10 +1087,15 @@ export default function SoundsScreen() {
               });
             }
           },
-          false // Don't download entire file before playing
+          false
         );
 
-        // Start playback immediately without waiting if audio is playing (non-blocking)
+        setLoadingSounds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(soundItem.id);
+          return newSet;
+        });
+
         if (isPlaying) {
           console.log(
             `⏯️  Triggering playback for mixer sound ${soundItem.id}...`
@@ -1553,20 +1113,9 @@ export default function SoundsScreen() {
           id: soundItem.id,
         });
 
-        // Clear selectedSounds since it's now active
-        setSelectedSounds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(soundItem.id);
-          return newSet;
-        });
+        setActiveSounds(newActiveSounds);
       } catch (error) {
-        // Clear loading and selected state on error
         setLoadingSounds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(soundItem.id);
-          return newSet;
-        });
-        setSelectedSounds((prev) => {
           const newSet = new Set(prev);
           newSet.delete(soundItem.id);
           return newSet;
@@ -1577,10 +1126,11 @@ export default function SoundsScreen() {
           "Could not load sound. Please check your internet connection."
         );
         console.error("Error playing sound:", error);
+        return;
       }
     }
 
-    setActiveSounds(newActiveSounds);
+    // Update playing state
     if (newActiveSounds.size > 0 && !isPlaying) {
       setIsPlaying(true);
     } else if (newActiveSounds.size === 0) {
@@ -1606,7 +1156,323 @@ export default function SoundsScreen() {
     }
   };
 
-  // Play single sound (from main list)
+  // Download sound for offline use
+  const handleDownloadSound = useCallback(
+    async (soundItem: any) => {
+      console.log(
+        `🎯 [handleDownloadSound] Clicked for sound ${soundItem.id} - ${soundItem.name}`
+      );
+
+      const isFreeDownloadable = !soundItem.premium;
+
+      if (!pro && !isFreeDownloadable) {
+        console.log(
+          `🎯 [handleDownloadSound] Free user tried to download pro sound`
+        );
+        showSnackbar("Upgrade to Pro to save sounds for offline use");
+        Analytics.trackPaywallViewed("offline_limit");
+        setPaywallOpen(true);
+        return;
+      }
+
+      if (soundItem.isLocal) {
+        console.log(`🎯 [handleDownloadSound] Skipping - local sound`);
+        return;
+      }
+
+      if (downloadingStates.has(soundItem.id)) {
+        console.log(
+          `🎯 [handleDownloadSound] Already downloading, ignoring duplicate`
+        );
+        return;
+      }
+
+      try {
+        console.log(
+          `🎯 [handleDownloadSound] Setting downloading state for ${soundItem.id}`
+        );
+        setDownloadingStates((prev) => new Set(prev).add(soundItem.id));
+
+        console.log(
+          `🎯 [handleDownloadSound] Calling soundCache.initiateDownload with pro=${pro}`
+        );
+        const success = await soundCache.initiateDownload(soundItem, pro);
+        console.log(
+          `🎯 [handleDownloadSound] initiateDownload returned: ${success} for sound ${soundItem.id}`
+        );
+
+        if (success) {
+          console.log(
+            `🎯 [handleDownloadSound] Marking ${soundItem.id} as downloaded`
+          );
+          setDownloadedSounds((prev) => new Set(prev).add(soundItem.id));
+
+          showSnackbar(`${soundItem.name} saved for offline use!`);
+          Analytics.trackSoundDownloaded(soundItem.id, soundItem.name);
+        } else {
+          console.log(
+            `🎯 [handleDownloadSound] Download failed for ${soundItem.id}`
+          );
+          if (!pro && !soundCache.canDownloadMore(pro)) {
+            showSnackbar(
+              `Free users can save 1 offline sound. Upgrade to Pro for unlimited.`
+            );
+            Analytics.trackPaywallViewed("offline_limit");
+            setPaywallOpen(true);
+          } else {
+            showSnackbar(`Failed to download ${soundItem.name}`);
+          }
+        }
+      } catch (error) {
+        console.error(`🎯 [handleDownloadSound] Exception:`, error);
+        showSnackbar(`Error downloading ${soundItem.name}`);
+      } finally {
+        console.log(`🎯 [handleDownloadSound] Removing from downloading state`);
+        setDownloadingStates((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(soundItem.id);
+          return newSet;
+        });
+      }
+    },
+    [downloadingStates, pro, showSnackbar]
+  );
+
+  // Fade in sound over duration
+  const fadeInSound = useCallback(
+    async (sound: any, targetVolume: number, duration: number = 1500) => {
+      try {
+        if (!sound) {
+          console.warn("⚠️  fadeInSound: sound object is null/undefined");
+          return;
+        }
+
+        const startVolume = 0;
+        const startTime = Date.now();
+        const steps = 30;
+        const stepDuration = duration / steps;
+
+        const fadeStep = (elapsed: number) => {
+          if (elapsed >= duration) {
+            sound.setVolumeAsync(targetVolume).catch((err: any) => {
+              console.warn("⚠️  setVolumeAsync failed at end of fade:", err);
+            });
+            return;
+          }
+
+          const progress = elapsed / duration;
+          const currentVolume =
+            startVolume + (targetVolume - startVolume) * progress;
+          sound.setVolumeAsync(currentVolume).catch((err: any) => {
+            console.warn("⚠️  setVolumeAsync failed during fade:", err);
+          });
+
+          setTimeout(() => fadeStep(Date.now() - startTime), stepDuration);
+        };
+
+        fadeStep(0);
+      } catch (error) {
+        console.error("Error fading in sound:", error);
+        if (sound) {
+          sound.setVolumeAsync(targetVolume).catch((err: any) => {
+            console.warn("⚠️  Fallback setVolumeAsync failed:", err);
+          });
+        }
+      }
+    },
+    []
+  );
+
+  // Fade out sound over duration
+  const fadeOutSound = useCallback(
+    async (sound: any, startVolume: number, duration: number = 1500) => {
+      try {
+        if (!sound) {
+          console.warn("⚠️  fadeOutSound: sound object is null/undefined");
+          return;
+        }
+
+        const startTime = Date.now();
+        const steps = 30;
+        const stepDuration = duration / steps;
+
+        const fadeStep = (elapsed: number) => {
+          if (elapsed >= duration) {
+            sound.setVolumeAsync(0).catch((err: any) => {
+              console.warn("⚠️  setVolumeAsync(0) failed at end of fade:", err);
+            });
+            return;
+          }
+
+          const progress = elapsed / duration;
+          const currentVolume = startVolume * (1 - progress);
+          sound.setVolumeAsync(currentVolume).catch((err: any) => {
+            console.warn("⚠️  setVolumeAsync failed during fade out:", err);
+          });
+
+          setTimeout(() => fadeStep(Date.now() - startTime), stepDuration);
+        };
+
+        fadeStep(0);
+      } catch (error) {
+        console.error("Error fading out sound:", error);
+        if (sound) {
+          sound.setVolumeAsync(0).catch((err: any) => {
+            console.warn("⚠️  Fallback setVolumeAsync(0) failed:", err);
+          });
+        }
+      }
+    },
+    []
+  );
+
+  // Helper function to clean up existing sounds without resetting state
+  const cleanupExistingSounds = useCallback(async (): Promise<void> => {
+    if (activeSounds.size === 0) {
+      return;
+    }
+
+    const soundIds = Array.from(activeSounds.keys());
+    console.log(`🧹 Cleaning up ${soundIds.length} existing sound(s)...`);
+
+    const cleanupPromises: Promise<void>[] = [];
+
+    for (const [id, data] of activeSounds.entries()) {
+      if (data?.sound) {
+        const cleanupSound = async () => {
+          try {
+            console.log(
+              `  ⏹️  Cleaning up sound ${id} (${data.soundItem.name})...`
+            );
+
+            // Clear playback status listener to prevent memory leaks
+            try {
+              data.sound.setOnPlaybackStatusUpdate(null);
+            } catch (listenerError) {
+              console.warn(
+                `⚠️  Could not clear listener for sound ${id}:`,
+                listenerError
+              );
+            }
+
+            // Stop the sound
+            try {
+              await data.sound.stopAsync();
+            } catch (stopError) {
+              console.warn(`⚠️  Stop failed for sound ${id}:`, stopError);
+            }
+
+            // Unload the sound
+            try {
+              await data.sound.unloadAsync();
+            } catch (unloadError) {
+              console.warn(`⚠️  Unload failed for sound ${id}:`, unloadError);
+            }
+
+            console.log(`  ✅ Sound ${id} cleaned up`);
+          } catch (error) {
+            console.error(`Error cleaning up sound ${id}:`, error);
+          }
+        };
+
+        cleanupPromises.push(cleanupSound());
+      }
+    }
+
+    await Promise.all(cleanupPromises);
+
+    // Hide notification after cleanup
+    try {
+      await hidePlayingNotification();
+    } catch (notifError) {
+      console.log("📢 Notification dismiss skipped:", notifError);
+    }
+
+    console.log(`✅ All ${soundIds.length} sound(s) cleaned up`);
+  }, [activeSounds]);
+
+  // Helper function to load a new sound (returns sound object, doesn't play yet)
+  const loadNewSound = useCallback(
+    async (
+      soundItem: any
+    ): Promise<{
+      sound: Audio.Sound;
+      soundItem: any;
+      volume: number;
+      isMuted: boolean;
+      id: number;
+    }> => {
+      console.log(`📦 Loading sound ${soundItem.id} (${soundItem.name})...`);
+
+      // Get source using sound cache - prioritize playback if not cached
+      const source = await soundCache.getSource(soundItem, true, true);
+
+      // Register callback for when download completes (background caching)
+      if (!soundCache.isDownloaded(soundItem.id)) {
+        soundCache.onDownloadComplete(
+          soundItem.id,
+          (completedId: number, success: boolean) => {
+            if (success) {
+              setDownloadedSounds((prev) => {
+                const newSet = new Set(prev);
+                newSet.add(completedId);
+                return newSet;
+              });
+              const sound = WHITE_NOISE_SOUNDS.find(
+                (s) => s.id === completedId
+              );
+              if (sound) {
+                showSnackbar(`${sound.name} saved for offline`);
+                Analytics.trackSoundDownloaded(completedId, sound.name);
+              }
+            } else {
+              const sound = WHITE_NOISE_SOUNDS.find(
+                (s) => s.id === completedId
+              );
+              if (sound) {
+                showSnackbar(`Failed to save ${sound.name} for offline`);
+              }
+            }
+          }
+        );
+      }
+
+      // Update downloaded state if already cached
+      if (soundCache.isDownloaded(soundItem.id)) {
+        setDownloadedSounds((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(soundItem.id);
+          return newSet;
+        });
+      }
+
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        source,
+        {
+          isLooping: true,
+          volume: 0, // Start at 0, we'll fade in after playback starts
+          shouldPlay: false,
+          progressUpdateIntervalMillis: 1000,
+          androidImplementation: "MediaPlayer",
+        },
+        undefined, // No status callback during load - we'll set it after
+        false // Don't download entire file before playing
+      );
+
+      console.log(`✅ Sound ${soundItem.id} (${soundItem.name}) loaded`);
+
+      return {
+        sound: newSound,
+        soundItem,
+        volume: 0.5,
+        isMuted: globalMuted,
+        id: soundItem.id,
+      };
+    },
+    [globalMuted, showSnackbar]
+  );
+
+  // Main function to play a single sound (with parallel cleanup + load)
   const tryPlaySingle = async (soundItem: any) => {
     // Check if sound is premium and user doesn't have pro
     console.log(`Trying to play: ${soundItem.name}`);
@@ -1639,180 +1505,84 @@ export default function SoundsScreen() {
       return;
     }
 
-    // Immediately mark sound as selected to show border
+    // Immediate visual feedback - show selection border
     setSelectedSounds(new Set([soundItem.id]));
+    setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
 
-    // Stop all other sounds and play just this one
-    console.log(
-      `🎵 Switching to sound ${soundItem.id} (${soundItem.name}), stopping previous sounds...`
-    );
+    console.log(`🎵 Switching to sound ${soundItem.id} (${soundItem.name})...`);
 
-    // Wait for cleanup to complete
-    console.log(`⏱️ Stopping all previous sounds...`);
-    await stopAllSounds().catch((err) =>
-      console.error("Error during cleanup:", err)
-    );
+    try {
+      // Run cleanup and loading in parallel for faster switching
+      const [, soundData] = await Promise.all([
+        cleanupExistingSounds(),
+        loadNewSound(soundItem),
+      ]);
 
-    // Start new sound after cleanup is complete
-    console.log(`⚡ Starting playback of new sound...`);
-    await playSingleSound(soundItem);
-  };
+      // Clear loading state now that sound is loaded
+      setLoadingSounds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(soundItem.id);
+        return newSet;
+      });
 
-  const playSingleSound = useCallback(
-    async (soundItem: any) => {
-      try {
-        console.log(
-          `🎶 Starting playback of sound ${soundItem.id} (${soundItem.name})...`
-        );
-        // Show loading state
-        setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
+      // Start playback
+      console.log(`⏯️  Starting playback for sound ${soundItem.id}...`);
+      await soundData.sound.playAsync();
 
-        // Get source using sound cache - prioritize playback if not cached
-        const source = await soundCache.getSource(soundItem, true, true);
+      // Fade in to target volume
+      fadeInSound(
+        soundData.sound,
+        soundData.isMuted ? 0 : soundData.volume,
+        500
+      );
 
-        // Register callback for when download completes
-        if (!soundCache.isDownloaded(soundItem.id)) {
-          soundCache.onDownloadComplete(
-            soundItem.id,
-            (completedId: number, success: boolean) => {
-              if (success) {
-                setDownloadedSounds((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.add(completedId);
-                  return newSet;
-                });
-                setFailedDownloads((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.delete(completedId);
-                  return newSet;
-                });
-                const sound = WHITE_NOISE_SOUNDS.find(
-                  (s) => s.id === completedId
-                );
-                if (sound) {
-                  showSnackbar(`${sound.name} saved for offline`);
-                  Analytics.trackSoundDownloaded(completedId, sound.name);
-                }
-              } else {
-                setFailedDownloads((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.add(completedId);
-                  return newSet;
-                });
-                const sound = WHITE_NOISE_SOUNDS.find(
-                  (s) => s.id === completedId
-                );
-                if (sound) {
-                  showSnackbar(`Failed to save ${sound.name} for offline`);
-                }
-              }
-            }
-          );
-        }
+      // Set up playback status listener
+      soundData.sound.setOnPlaybackStatusUpdate((status) => {
+        if ((status as any).isLoaded) {
+          setIsPlaying((status as any).isPlaying);
 
-        // If sound was already downloaded, update UI immediately
-        if (
-          soundCache.isDownloaded(soundItem.id) &&
-          !downloadedSounds.has(soundItem.id)
-        ) {
-          setDownloadedSounds((prev) => {
-            const newSet = new Set(prev);
-            newSet.add(soundItem.id);
-            return newSet;
-          });
-        }
-
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          source,
-          {
-            isLooping: true,
-            volume: globalMuted ? 0 : 0.5,
-            shouldPlay: false, // Don't wait for initial play, we'll trigger it separately
-            progressUpdateIntervalMillis: 1000, // Reduced frequency for better performance
-            // Optimize for faster initial playback
-            androidImplementation: "MediaPlayer",
-          },
-          (status) => {
-            // Remove loading state once sound can play
-            if (
-              status.isLoaded &&
-              status.durationMillis &&
-              status.durationMillis > 0
-            ) {
-              setLoadingSounds((prev) => {
-                const newSet = new Set(prev);
-                newSet.delete(soundItem.id);
-                return newSet;
-              });
-            }
-          },
-          false // Don't download entire file before playing
-        );
-
-        // Start playback immediately without waiting (non-blocking)
-        console.log(`⏯️  Triggering playback for sound ${soundItem.id}...`);
-        newSound.playAsync().catch((err) => {
-          console.error(`Error playing sound ${soundItem.id}:`, err);
-        });
-
-        // Handle playback status updates including interruptions
-        newSound.setOnPlaybackStatusUpdate((status) => {
-          if ((status as any).isLoaded) {
-            setIsPlaying((status as any).isPlaying);
-
-            // Handle audio interruptions (calls, other apps, etc.)
-            if (
-              (status as any).isPlaying === false &&
-              !(status as any).didJustFinish
-            ) {
-              console.log("⚠️ Audio interrupted or paused by system");
-            }
+          if (
+            (status as any).isPlaying === false &&
+            !(status as any).didJustFinish
+          ) {
+            console.log("⚠️ Audio interrupted or paused by system");
           }
-        });
+        }
+      });
 
-        const newActiveSounds = new Map();
-        newActiveSounds.set(soundItem.id, {
-          sound: newSound,
-          soundItem,
-          volume: 0.5,
-          isMuted: globalMuted,
-          id: soundItem.id,
-        });
+      // Update state atomically
+      const newActiveSounds = new Map();
+      newActiveSounds.set(soundItem.id, soundData);
 
-        setActiveSounds(newActiveSounds);
-        setIsPlaying(true);
-        console.log(
-          `✅ Sound ${soundItem.id} (${soundItem.name}) now playing!`
-        );
+      setActiveSounds(newActiveSounds);
+      setIsPlaying(true);
+      setSelectedSounds(new Set()); // Clear selection since now active
 
-        // Clear selectedSounds since it's now active
-        setSelectedSounds(new Set());
+      console.log(`✅ Sound ${soundItem.id} (${soundItem.name}) now playing!`);
 
-        // Show notification for background playback asynchronously (non-blocking)
-        showPlayingNotification(soundItem.name, false).catch((notifError) => {
-          // Silently ignore notification errors - they shouldn't crash playback
-          console.log("📢 Notification skipped:", notifError);
-        });
-      } catch (error) {
-        // Clear loading and selected state on error
-        setLoadingSounds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(soundItem.id);
-          return newSet;
-        });
-        setSelectedSounds(new Set());
+      // Show notification (non-blocking)
+      showPlayingNotification(soundItem.name, false).catch((notifError) => {
+        console.log("📢 Notification skipped:", notifError);
+      });
+    } catch (error) {
+      // Clear loading and selected state on error
+      setLoadingSounds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(soundItem.id);
+        return newSet;
+      });
+      setSelectedSounds(new Set());
 
-        Alert.alert("Error", "Could not play sound. Please try again later.");
-        console.error("Error playing sound:", error);
-      }
-    },
-    [globalMuted, showSnackbar]
-  );
+      Alert.alert("Error", "Could not play sound. Please try again later.");
+      console.error("Error playing sound:", error);
+    }
+  };
 
   const pauseAllSounds = useCallback(async () => {
     for (const [, data] of activeSounds.entries()) {
       if (data?.sound) {
         try {
+          await fadeOutSound(data.sound, data.volume, 1000);
           await data.sound.pauseAsync();
         } catch (error) {
           console.error("Error pausing sound:", error);
@@ -1821,29 +1591,30 @@ export default function SoundsScreen() {
     }
     setIsPlaying(false);
 
-    // Track pause event
     Analytics.trackSoundPaused();
 
-    // Update notification to show paused state
     if (activeSounds.size > 0) {
       const firstSound = Array.from(activeSounds.values())[0];
       if (firstSound?.soundItem?.name) {
         try {
           await showPlayingNotification(firstSound.soundItem.name, true);
         } catch (notifError) {
-          // Silently ignore notification errors
           console.log("📢 Notification skipped:", notifError);
         }
       }
     }
-  }, [activeSounds]);
+  }, [activeSounds, fadeOutSound]);
 
   const resumeAllSounds = useCallback(async () => {
     try {
       for (const [, data] of activeSounds.entries()) {
         if (data?.sound) {
           try {
+            await data.sound.setVolumeAsync(0);
             await data.sound.playAsync();
+            fadeInSound(data.sound, data.volume, 1000).catch((err) => {
+              console.error("Error during fade in:", err);
+            });
           } catch (error) {
             console.error("Error resuming sound:", error);
           }
@@ -1851,17 +1622,14 @@ export default function SoundsScreen() {
       }
       setIsPlaying(true);
 
-      // Track resume event
       Analytics.trackSoundResumed();
 
-      // Update notification to show playing state
       if (activeSounds.size > 0) {
         const firstSound = Array.from(activeSounds.values())[0];
         if (firstSound?.soundItem?.name) {
           try {
             await showPlayingNotification(firstSound.soundItem.name, false);
           } catch (notifError) {
-            // Silently ignore notification errors
             console.log("📢 Notification skipped:", notifError);
           }
         }
@@ -1870,7 +1638,7 @@ export default function SoundsScreen() {
       Alert.alert("Error", "Could not resume sounds.");
       console.error("Error resuming sounds:", error);
     }
-  }, [activeSounds]);
+  }, [activeSounds, fadeInSound]);
 
   const stopAllSounds = useCallback(async () => {
     try {
@@ -1888,16 +1656,36 @@ export default function SoundsScreen() {
         timerIntervalRef.current = null;
       }
 
-      // Stop and unload all sounds
+      // Stop and unload all sounds with proper cleanup
       for (const [id, data] of activeSounds.entries()) {
         if (data?.sound) {
           try {
             console.log(
               `  ⏹️  Stopping sound ${id} (${data.soundItem.name})...`
             );
-            await data.sound.stopAsync();
-            await data.sound.unloadAsync();
-            console.log(`  ✅ Sound ${id} stopped and unloaded`);
+
+            try {
+              data.sound.setOnPlaybackStatusUpdate(null);
+            } catch (listenerError) {
+              console.warn(
+                `⚠️  Could not clear listener for sound ${id}:`,
+                listenerError
+              );
+            }
+
+            try {
+              await data.sound.stopAsync();
+            } catch (stopError) {
+              console.warn(`⚠️  Stop failed for sound ${id}:`, stopError);
+            }
+
+            try {
+              await data.sound.unloadAsync();
+            } catch (unloadError) {
+              console.warn(`⚠️  Unload failed for sound ${id}:`, unloadError);
+            }
+
+            console.log(`  ✅ Sound ${id} cleaned up`);
           } catch (error) {
             console.error(`Error stopping sound ${id}:`, error);
           }
@@ -1914,79 +1702,20 @@ export default function SoundsScreen() {
         console.log(`✅ All ${soundCount} sound(s) stopped and states reset`);
       }
 
-      // Track stop event if sounds were playing
       if (soundCount > 0) {
         Analytics.trackAllSoundsStopped(soundCount);
       }
 
-      // Hide notification when stopped
       try {
         await hidePlayingNotification();
       } catch (notifError) {
-        // Silently ignore notification errors
         console.log("📢 Notification dismiss skipped:", notifError);
       }
     } catch (error) {
       Alert.alert("Error", "Could not stop sounds.");
       console.error("Error stopping sounds:", error);
     }
-  }, [activeSounds]);
-
-  const playNextFavorite = useCallback(async () => {
-    try {
-      // Get all favorite sounds
-      const favoriteSounds = WHITE_NOISE_SOUNDS.filter((sound) =>
-        favorites.has(sound.id)
-      );
-
-      if (favoriteSounds.length === 0) {
-        console.log("No favorites to play");
-        return;
-      }
-
-      // Get current playing sound
-      const currentSound =
-        activeSounds.size > 0
-          ? Array.from(activeSounds.values())[0]?.soundItem
-          : null;
-
-      // Find next favorite
-      let nextSound;
-      if (currentSound) {
-        const currentIndex = favoriteSounds.findIndex(
-          (s) => s.id === currentSound.id
-        );
-        if (currentIndex !== -1) {
-          const nextIndex = (currentIndex + 1) % favoriteSounds.length;
-          nextSound = favoriteSounds[nextIndex];
-        } else {
-          // Current sound not in favorites, play first favorite
-          nextSound = favoriteSounds[0];
-        }
-      } else {
-        // No current sound, play first favorite
-        nextSound = favoriteSounds[0];
-      }
-
-      // Validate nextSound exists
-      if (!nextSound) {
-        console.error("Could not determine next sound");
-        return;
-      }
-
-      // Check if premium
-      if (nextSound.premium && !pro) {
-        console.log("Next sound is premium");
-        return;
-      }
-
-      // Stop current and play next
-      await stopAllSounds();
-      await playSingleSound(nextSound);
-    } catch (error) {
-      console.error("Error playing next favorite:", error);
-    }
-  }, [activeSounds, favorites, pro, stopAllSounds, playSingleSound]);
+  }, [activeSounds, hidePlayingNotification]);
 
   // Register stopAllSounds callback with context - use ref to avoid re-renders
   const stopAllSoundsRef = useRef(stopAllSounds);
@@ -2007,7 +1736,6 @@ export default function SoundsScreen() {
   const notificationPauseRef = useRef(pauseAllSounds);
   const notificationResumeRef = useRef(resumeAllSounds);
 
-  // Update refs when functions change
   useEffect(() => {
     notificationPauseRef.current = pauseAllSounds;
     notificationResumeRef.current = resumeAllSounds;
@@ -2015,7 +1743,6 @@ export default function SoundsScreen() {
 
   // Setup notification listener
   useEffect(() => {
-    // Listen for notification action responses
     const subscription = Notifications.addNotificationResponseReceivedListener(
       async (response) => {
         const action = response.actionIdentifier;
@@ -2040,16 +1767,10 @@ export default function SoundsScreen() {
     };
   }, []);
 
-  const handleOverlayPress = () => {
-    handleClosePlayer();
-  };
-
   const handleSetTimer = useCallback((minutes: number | null) => {
     if (minutes === null) {
-      // Clearing timer
       Analytics.trackTimerCleared();
     } else {
-      // Setting timer
       Analytics.trackTimerSet(minutes);
     }
     setTimerMinutes(minutes);
@@ -2069,17 +1790,6 @@ export default function SoundsScreen() {
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
   }, []);
 
-  // Get display name for current sounds (memoized)
-  const getCurrentSoundsDisplay = React.useCallback(() => {
-    const names = Array.from(activeSounds.values()).map(
-      (data) => data.soundItem.name
-    );
-    if (names.length === 0) return "";
-    if (names.length === 1) return names[0];
-    if (names.length === 2) return names.join(" & ");
-    return `${names[0]} + ${names.length - 1} more`;
-  }, [activeSounds]);
-
   // Memoized SoundCard to prevent unnecessary re-renders
   const SoundCard = React.memo(
     ({ soundItem, index }: { soundItem: any; index: number }) => {
@@ -2088,16 +1798,15 @@ export default function SoundsScreen() {
         isQuickPlaying && favoriteSoundId === String(soundItem.id);
       const isLoading = loadingSounds.has(soundItem.id);
       const isSelected = selectedSounds.has(soundItem.id);
+      const isDownloading = downloadingStates.has(soundItem.id);
+      const isDownloaded = downloadedSounds.has(soundItem.id);
 
-      // Animation values
       const cardScale = useRef(new Animated.Value(1)).current;
       const heartScale = useRef(new Animated.Value(1)).current;
       const iconPulse = useRef(new Animated.Value(1)).current;
 
-      // Animate when sound becomes active/inactive
       useEffect(() => {
         if (isActive || isQuickPlayActive) {
-          // Start pulsing animation for icon
           Animated.loop(
             Animated.sequence([
               Animated.timing(iconPulse, {
@@ -2115,7 +1824,6 @@ export default function SoundsScreen() {
             ])
           ).start();
         } else {
-          // Stop pulsing
           iconPulse.stopAnimation();
           Animated.timing(iconPulse, {
             toValue: 1,
@@ -2128,7 +1836,6 @@ export default function SoundsScreen() {
       const handlePress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-        // Animate card press
         Animated.sequence([
           Animated.timing(cardScale, {
             toValue: 0.97,
@@ -2143,7 +1850,6 @@ export default function SoundsScreen() {
           }),
         ]).start();
 
-        // Gate playback
         tryPlaySingle(soundItem);
       };
 
@@ -2151,7 +1857,6 @@ export default function SoundsScreen() {
         e.stopPropagation();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        // Animate heart with spring
         Animated.sequence([
           Animated.spring(heartScale, {
             toValue: 1.3,
@@ -2236,7 +1941,6 @@ export default function SoundsScreen() {
                 <Text style={[styles.soundName, { color: theme.text }]}>
                   {soundItem.name}
                 </Text>
-                {/* Quick Play tag - show if this sound is set as the quick play option */}
                 {favoriteSoundId === String(soundItem.id) && (
                   <View
                     style={{
@@ -2272,16 +1976,34 @@ export default function SoundsScreen() {
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
-              {/* Download indicator - show if sound is downloaded */}
-              {downloadedSounds.has(soundItem.id) && (
-                <View style={{ padding: 8 }}>
-                  <Ionicons name="cloud-done" size={20} color="#10b981" />
-                </View>
-              )}
+              {!soundItem.isLocal &&
+                !isDownloaded &&
+                (pro || !soundItem.premium) && (
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      handleDownloadSound(soundItem);
+                    }}
+                    style={{
+                      padding: 8,
+                      position: "relative",
+                    }}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <ActivityIndicator size="small" color={theme.primary} />
+                    ) : (
+                      <Ionicons
+                        name="cloud-download-outline"
+                        size={20}
+                        color={theme.primary}
+                      />
+                    )}
+                  </TouchableOpacity>
+                )}
 
-              {/* PRO badge for premium sounds (only if user doesn't have pro) OR Heart icon */}
               {soundItem.premium && !pro ? (
-                // Show PRO badge for premium sounds when user doesn't have pro
                 <View
                   style={{
                     backgroundColor: "#8b5cf6",
@@ -2303,7 +2025,6 @@ export default function SoundsScreen() {
                   </Text>
                 </View>
               ) : (
-                // Show heart icon for free sounds OR premium sounds when user has pro
                 <TouchableOpacity
                   onPress={handleHeartPress}
                   style={{
@@ -2339,12 +2060,15 @@ export default function SoundsScreen() {
       if (selectedCategory === "Favourites") {
         return favorites?.has(sound.id) || false;
       }
+      if (selectedCategory === "Downloaded") {
+        return sound.isLocal || downloadedSounds.has(sound.id);
+      }
       return (
         selectedCategory === SOUND_CATEGORIES.ALL ||
         sound.category === selectedCategory
       );
     });
-  }, [selectedCategory, favorites]);
+  }, [selectedCategory, favorites, downloadedSounds]);
 
   return (
     <View
@@ -2448,10 +2172,7 @@ export default function SoundsScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={[
-          styles.categoryTabs,
-          { paddingTop: pro ? 4 : 6 }, // Less top padding when pro badge is shown
-        ]}
+        style={[styles.categoryTabs, { paddingTop: pro ? 4 : 6 }]}
         contentContainerStyle={{
           paddingHorizontal: 16,
           gap: 8,
@@ -2491,6 +2212,55 @@ export default function SoundsScreen() {
               Favourites
             </Text>
             {selectedCategory === "Favourites" && (
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: -2,
+                  left: 8,
+                  right: 8,
+                  height: 3,
+                  backgroundColor: "white",
+                  borderRadius: 2,
+                }}
+              />
+            )}
+          </TouchableOpacity>
+        )}
+
+        {/* Show Downloaded category if there are any downloaded sounds */}
+        {downloadedSounds && downloadedSounds.size > 0 && (
+          <TouchableOpacity
+            key="Downloaded"
+            style={[
+              styles.categoryTab,
+              {
+                backgroundColor:
+                  selectedCategory === "Downloaded" ? "#10b981" : theme.surface,
+                borderColor: theme.border,
+              },
+            ]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Analytics.trackCategorySelected(
+                "Downloaded",
+                downloadedSounds.size
+              );
+              setSelectedCategory("Downloaded");
+            }}
+          >
+            <Text
+              style={[
+                styles.categoryTabText,
+                {
+                  color:
+                    selectedCategory === "Downloaded" ? "white" : theme.text,
+                  fontWeight: selectedCategory === "Downloaded" ? "700" : "600",
+                },
+              ]}
+            >
+              Offline
+            </Text>
+            {selectedCategory === "Downloaded" && (
               <View
                 style={{
                   position: "absolute",
@@ -2567,7 +2337,6 @@ export default function SoundsScreen() {
           }}
         >
           {isInitialLoad ? (
-            // Show skeleton loaders during initial load
             <>
               <SoundCardSkeleton />
               <SoundCardSkeleton />
@@ -2579,7 +2348,6 @@ export default function SoundsScreen() {
           ) : (
             <>
               {filteredSounds.length === 0 ? (
-                // Show empty state when no sounds match the filter
                 <EmptyPlayerState theme={theme} />
               ) : (
                 filteredSounds.map((soundItem, index) => (
@@ -2677,7 +2445,6 @@ export default function SoundsScreen() {
                     !loadingSounds.has(
                       Array.from(activeSounds.values())[0]?.soundItem?.id
                     ) ? (
-                      // Playing - show icon
                       <Ionicons
                         name={
                           Array.from(activeSounds.values())[0]?.soundItem
@@ -2687,14 +2454,12 @@ export default function SoundsScreen() {
                         color="white"
                       />
                     ) : selectedSounds.size > 0 ? (
-                      // Loading - show spinner
                       <ActivityIndicator
                         size="small"
                         color="white"
                         style={{ position: "absolute" }}
                       />
                     ) : (
-                      // Default icon
                       <Ionicons name="musical-notes" size={22} color="white" />
                     )}
                   </View>
@@ -2719,15 +2484,52 @@ export default function SoundsScreen() {
                         : "No sound"}
                     </Text>
                     {activeSounds.size > 1 && (
-                      <Text
+                      <View
                         style={{
-                          fontSize: 12,
-                          color: theme.textSecondary,
-                          fontWeight: "500",
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 6,
+                          marginTop: 4,
+                          flexWrap: "wrap",
                         }}
                       >
-                        +{activeSounds.size - 1} more
-                      </Text>
+                        {Array.from(activeSounds.values())
+                          .slice(1)
+                          .map((data, idx) => (
+                            <View
+                              key={data.soundItem.id}
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 4,
+                                backgroundColor: data.soundItem.color,
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 6,
+                              }}
+                            >
+                              <Ionicons
+                                name={
+                                  data.soundItem.icon as React.ComponentProps<
+                                    typeof Ionicons
+                                  >["name"]
+                                }
+                                size={12}
+                                color="white"
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  color: "white",
+                                  fontWeight: "600",
+                                }}
+                                numberOfLines={1}
+                              >
+                                {data.soundItem.name}
+                              </Text>
+                            </View>
+                          ))}
+                      </View>
                     )}
                     {activeSounds.size === 0 && selectedSounds.size > 0 && (
                       <Text
@@ -2789,14 +2591,14 @@ export default function SoundsScreen() {
                 <AnimatedControlButton
                   onPress={
                     selectedSounds.size > 0 && activeSounds.size === 0
-                      ? undefined // Disable when loading
+                      ? undefined
                       : isPlaying
                       ? pauseAllSounds
                       : resumeAllSounds
                   }
                   iconName={
                     selectedSounds.size > 0 && activeSounds.size === 0
-                      ? "hourglass" // Show loading icon when sounds are selected but not active
+                      ? "hourglass"
                       : isPlaying
                       ? "pause"
                       : "play"
@@ -2855,7 +2657,7 @@ export default function SoundsScreen() {
         currentTimer={timerMinutes}
       />
 
-      {/* Snackbar for favorites feedback - now with stacking and smooth transitions */}
+      {/* Snackbar for favorites feedback */}
       {snackbars.map((snackbar, index) => (
         <Animated.View
           key={snackbar.id}
@@ -3048,7 +2850,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1,
   },
-
   overlayTouchable: { flex: 1 },
   playerControls: {
     position: "absolute",

@@ -75,9 +75,22 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
       icon: "musical-notes",
       text: "Access to all 44 premium sounds",
     },
-    { icon: "infinite", text: "Advanced mixing and customization" },
-    { icon: "cloud-done", text: "Enhanced offline mode" },
-    { icon: "heart", text: "Support continued development" },
+    {
+      icon: "infinite",
+      text: "Unlimited offline sounds (free users: 1 only)",
+    },
+    {
+      icon: "layers",
+      text: "Sound mixing offline (free users: streaming only)",
+    },
+    {
+      icon: "wifi-off",
+      text: "Auto-save favorites for offline use",
+    },
+    {
+      icon: "volume-mute",
+      text: "No ads, ever",
+    },
   ];
 
   return (
@@ -116,7 +129,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                 Upgrade to Slumbr Pro
               </Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-                Even free has no ads • Upgrade for 44 premium sounds
+                Save unlimited sounds offline • Advanced mixing • No ads
               </Text>
             </View>
 
@@ -141,47 +154,133 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
             {/* Pricing */}
             {offerings?.availablePackages &&
             offerings.availablePackages.length > 0 ? (
-              <View style={styles.pricing}>
-                {offerings.availablePackages.map((pkg) => {
-                  const isPopular = pkg.packageType === "ANNUAL";
-                  return (
-                    <TouchableOpacity
-                      key={pkg.identifier}
+              <View style={styles.pricingContainer}>
+                {/* Main Pricing: Monthly and Yearly */}
+                <View style={styles.pricing}>
+                  {offerings.availablePackages
+                    .filter(
+                      (pkg) =>
+                        pkg.packageType === "MONTHLY" ||
+                        pkg.packageType === "ANNUAL"
+                    )
+                    .sort((a, b) => {
+                      // Show ANNUAL first, then MONTHLY
+                      if (a.packageType === "ANNUAL") return -1;
+                      if (b.packageType === "ANNUAL") return 1;
+                      return 0;
+                    })
+                    .map((pkg) => {
+                      const isAnnual = pkg.packageType === "ANNUAL";
+                      // Calculate savings for yearly
+                      const monthlyCost =
+                        offerings.availablePackages.find(
+                          (p) => p.packageType === "MONTHLY"
+                        )?.product.price || 0;
+                      const yearlyCost = pkg.product.price || 0;
+                      const monthlySavings = (
+                        ((monthlyCost * 12 - yearlyCost) / (monthlyCost * 12)) *
+                        100
+                      ).toFixed(0);
+
+                      return (
+                        <TouchableOpacity
+                          key={pkg.identifier}
+                          style={[
+                            styles.priceButton,
+                            { backgroundColor: theme.primary },
+                            isAnnual && styles.bestValueButton,
+                          ]}
+                          onPress={() => handlePurchase(pkg)}
+                          disabled={loading}
+                        >
+                          {isAnnual && (
+                            <View style={styles.savingsBadge}>
+                              <Text style={styles.savingsText}>
+                                Save {monthlySavings}%
+                              </Text>
+                            </View>
+                          )}
+                          {loading ? (
+                            <ActivityIndicator color="white" />
+                          ) : (
+                            <>
+                              <Text style={styles.priceTitle}>
+                                {isAnnual ? "Yearly" : "Monthly"}
+                              </Text>
+                              <Text style={styles.priceAmount}>
+                                {pkg.product.priceString}
+                              </Text>
+                              <Text style={styles.priceSubtext}>
+                                {isAnnual
+                                  ? "per year"
+                                  : `${(pkg.product.price / 12).toFixed(
+                                      2
+                                    )}$/month`}
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                </View>
+
+                {/* Lifetime Option (Secondary CTA - Slightly Hidden) */}
+                {offerings.availablePackages.find(
+                  (pkg) => pkg.packageType === "LIFETIME"
+                ) && (
+                  <View style={styles.lifetimeSection}>
+                    <Text
                       style={[
-                        styles.priceButton,
-                        { backgroundColor: theme.primary },
-                        isPopular && styles.popularButton,
+                        styles.lifetimeLabel,
+                        { color: theme.textSecondary },
                       ]}
-                      onPress={() => handlePurchase(pkg)}
+                    >
+                      Prefer to own it?
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.lifetimeButton,
+                        { borderColor: theme.primary },
+                      ]}
+                      onPress={() =>
+                        handlePurchase(
+                          offerings.availablePackages.find(
+                            (pkg) => pkg.packageType === "LIFETIME"
+                          )!
+                        )
+                      }
                       disabled={loading}
                     >
-                      {isPopular && (
-                        <View style={styles.popularBadge}>
-                          <Text style={styles.popularText}>BEST VALUE</Text>
-                        </View>
-                      )}
                       {loading ? (
-                        <ActivityIndicator color="white" />
+                        <ActivityIndicator color={theme.primary} />
                       ) : (
                         <>
-                          <Text style={styles.priceTitle}>
-                            {pkg.product.title}
+                          <Text
+                            style={[
+                              styles.lifetimeTitle,
+                              { color: theme.primary },
+                            ]}
+                          >
+                            Lifetime Access
                           </Text>
-                          <Text style={styles.priceAmount}>
-                            {pkg.product.priceString}
-                            {pkg.packageType === "MONTHLY" && "/month"}
-                            {pkg.packageType === "ANNUAL" && "/year"}
+                          <Text
+                            style={[
+                              styles.lifetimePrice,
+                              { color: theme.primary },
+                            ]}
+                          >
+                            {
+                              offerings.availablePackages.find(
+                                (pkg) => pkg.packageType === "LIFETIME"
+                              )?.product.priceString
+                            }
+                            {" one-time"}
                           </Text>
-                          {pkg.packageType === "LIFETIME" && (
-                            <Text style={styles.priceSubtext}>
-                              One-time payment
-                            </Text>
-                          )}
                         </>
                       )}
                     </TouchableOpacity>
-                  );
-                })}
+                  </View>
+                )}
               </View>
             ) : (
               <View style={styles.loadingContainer}>
@@ -286,27 +385,30 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 16,
   },
+  pricingContainer: {
+    marginBottom: 16,
+  },
   priceButton: {
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
     position: "relative",
   },
-  popularButton: {
+  bestValueButton: {
     borderWidth: 2,
     borderColor: "#FFD700",
   },
-  popularBadge: {
+  savingsBadge: {
     position: "absolute",
     top: -10,
     right: 10,
-    backgroundColor: "#FFD700",
+    backgroundColor: "#10b981",
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  popularText: {
-    color: "#000",
+  savingsText: {
+    color: "white",
     fontSize: 11,
     fontWeight: "800",
   },
@@ -318,13 +420,42 @@ const styles = StyleSheet.create({
   },
   priceAmount: {
     color: "white",
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "bold",
   },
   priceSubtext: {
     color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 14,
+    fontSize: 13,
     marginTop: 4,
+  },
+  // Lifetime section styles
+  lifetimeSection: {
+    alignItems: "center",
+    gap: 8,
+  },
+  lifetimeLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  lifetimeButton: {
+    width: "100%",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  lifetimeTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  lifetimePrice: {
+    fontSize: 14,
+    fontWeight: "500",
   },
   loadingContainer: {
     padding: 40,
