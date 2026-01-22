@@ -11,6 +11,7 @@ import { soundCache } from "@/utils/soundCache";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import * as Haptics from "expo-haptics";
+import * as Network from "expo-network";
 
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useRevenueCat } from "@/contexts/revenuecat";
@@ -568,6 +569,136 @@ function EmptyPlayerState({ theme }: { theme: any }) {
   );
 }
 
+/* ================== NETWORK DETECTION ================== */
+/**
+ * Check if device has internet connectivity
+ * Returns false for airplane mode or no internet
+ */
+const checkNetworkConnectivity = async (): Promise<boolean> => {
+  try {
+    const state = await Network.getNetworkStateAsync();
+    const isConnected =
+      state.isConnected === true && state.isInternetReachable === true;
+    console.log(`📡 Network status: ${isConnected ? "ONLINE" : "OFFLINE"}`);
+    return isConnected;
+  } catch {
+    console.log("📡 Network check failed, assuming offline");
+    return false;
+  }
+};
+
+/* ================== SAFE ANALYTICS WRAPPER ================== */
+/**
+ * Wraps all analytics calls to gracefully handle offline/airplane mode
+ * Prevents any network errors from blocking app functionality
+ */
+const safeAnalytics = {
+  trackSoundPlayed: (
+    id: number,
+    name: string,
+    premium: boolean,
+    mode: "single" | "mixer"
+  ) => {
+    try {
+      Analytics.trackSoundPlayed(id, name, premium, mode);
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackSoundPaused: () => {
+    try {
+      Analytics.trackSoundPaused();
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackSoundResumed: () => {
+    try {
+      Analytics.trackSoundResumed();
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackAllSoundsStopped: (count: number) => {
+    try {
+      Analytics.trackAllSoundsStopped(count);
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackTimerSet: (minutes: number) => {
+    try {
+      Analytics.trackTimerSet(minutes);
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackTimerCleared: () => {
+    try {
+      Analytics.trackTimerCleared();
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackTimerCompleted: (minutes: number) => {
+    try {
+      Analytics.trackTimerCompleted(minutes);
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackPaywallViewed: (
+    source:
+      | "offline_limit"
+      | "mixer"
+      | "premium_sound"
+      | "banner"
+      | "settings"
+      | "favorite"
+  ) => {
+    try {
+      Analytics.trackPaywallViewed(source);
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackFavoriteAdded: (id: number, name: string, premium: boolean) => {
+    try {
+      Analytics.trackFavoriteAdded(id, name, premium);
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackFavoriteRemoved: (id: number, name: string) => {
+    try {
+      Analytics.trackFavoriteRemoved(id, name);
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackSoundDownloaded: (id: number, name: string) => {
+    try {
+      Analytics.trackSoundDownloaded(id, name);
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  trackCategorySelected: (category: string, count: number) => {
+    try {
+      Analytics.trackCategorySelected(category, count);
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+  incrementUserProperty: (property: string, value: number) => {
+    try {
+      Analytics.incrementUserProperty(property, value);
+    } catch {
+      console.log("📊 Analytics unavailable (offline)");
+    }
+  },
+};
+
 /* ================== MAIN SCREEN ================== */
 export default function SoundsScreen() {
   const { theme, themeMode } = useTheme();
@@ -749,7 +880,7 @@ export default function SoundsScreen() {
           const newSeconds = prev - 1;
           if (newSeconds <= 0) {
             // Timer finished - schedule stop for next render cycle
-            Analytics.trackTimerCompleted(timerMinutes);
+            safeAnalytics.trackTimerCompleted(timerMinutes);
             return 0;
           }
           return newSeconds;
@@ -773,7 +904,8 @@ export default function SoundsScreen() {
       }, 0);
       return () => clearTimeout(timeoutId);
     }
-  }, [timerSeconds, timerMinutes, isPlaying, stopAllSounds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timerSeconds, timerMinutes, isPlaying]);
 
   // Sync main playing state to context for quick play button
   useEffect(() => {
@@ -926,7 +1058,7 @@ export default function SoundsScreen() {
     const isPremium = sound?.premium || false;
 
     if (isPremium && !pro) {
-      Analytics.trackPaywallViewed("favorite");
+      safeAnalytics.trackPaywallViewed("favorite");
       setPaywallOpen(true);
       return;
     }
@@ -936,7 +1068,7 @@ export default function SoundsScreen() {
     if (newFavorites.has(soundId)) {
       newFavorites.delete(soundId);
       showSnackbar("Removed from favorites");
-      Analytics.trackFavoriteRemoved(soundId, sound?.name || "Unknown");
+      safeAnalytics.trackFavoriteRemoved(soundId, sound?.name || "Unknown");
 
       if (selectedCategory === "Favourites" && newFavorites.size === 0) {
         setSelectedCategory(SOUND_CATEGORIES.ALL);
@@ -944,12 +1076,12 @@ export default function SoundsScreen() {
     } else {
       newFavorites.add(soundId);
       showSnackbar("Added to favorites");
-      Analytics.trackFavoriteAdded(
+      safeAnalytics.trackFavoriteAdded(
         soundId,
         sound?.name || "Unknown",
         isPremium
       );
-      Analytics.incrementUserProperty("total_favorites_added", 1);
+      safeAnalytics.incrementUserProperty("total_favorites_added", 1);
     }
     setFavorites(newFavorites);
     saveFavorites(newFavorites);
@@ -1019,6 +1151,13 @@ export default function SoundsScreen() {
       newActiveSounds.delete(soundItem.id);
       setActiveSounds(newActiveSounds);
     } else {
+      // 🆕 LIMIT: Max 3 sounds in mixer
+      if (newActiveSounds.size >= 3) {
+        showSnackbar("Maximum 3 sounds can be mixed together");
+        console.log("⚠️  Mixer limit reached: max 3 sounds");
+        return;
+      }
+
       // Sound is not active - add it
       try {
         setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
@@ -1040,7 +1179,7 @@ export default function SoundsScreen() {
                 );
                 if (sound) {
                   showSnackbar(`${sound.name} saved for offline`);
-                  Analytics.trackSoundDownloaded(completedId, sound.name);
+                  safeAnalytics.trackSoundDownloaded(completedId, sound.name);
                 }
               } else {
                 const sound = WHITE_NOISE_SOUNDS.find(
@@ -1170,7 +1309,7 @@ export default function SoundsScreen() {
           `🎯 [handleDownloadSound] Free user tried to download pro sound`
         );
         showSnackbar("Upgrade to Pro to save sounds for offline use");
-        Analytics.trackPaywallViewed("offline_limit");
+        safeAnalytics.trackPaywallViewed("offline_limit");
         setPaywallOpen(true);
         return;
       }
@@ -1188,6 +1327,16 @@ export default function SoundsScreen() {
       }
 
       try {
+        // Check network connectivity first
+        const isOnline = await checkNetworkConnectivity();
+        if (!isOnline) {
+          showSnackbar(
+            "Cannot download in offline mode. Please check your internet connection."
+          );
+          console.log(`🎯 [handleDownloadSound] Device is offline`);
+          return;
+        }
+
         console.log(
           `🎯 [handleDownloadSound] Setting downloading state for ${soundItem.id}`
         );
@@ -1208,7 +1357,7 @@ export default function SoundsScreen() {
           setDownloadedSounds((prev) => new Set(prev).add(soundItem.id));
 
           showSnackbar(`${soundItem.name} saved for offline use!`);
-          Analytics.trackSoundDownloaded(soundItem.id, soundItem.name);
+          safeAnalytics.trackSoundDownloaded(soundItem.id, soundItem.name);
         } else {
           console.log(
             `🎯 [handleDownloadSound] Download failed for ${soundItem.id}`
@@ -1217,7 +1366,7 @@ export default function SoundsScreen() {
             showSnackbar(
               `Free users can save 1 offline sound. Upgrade to Pro for unlimited.`
             );
-            Analytics.trackPaywallViewed("offline_limit");
+            safeAnalytics.trackPaywallViewed("offline_limit");
             setPaywallOpen(true);
           } else {
             showSnackbar(`Failed to download ${soundItem.name}`);
@@ -1405,7 +1554,23 @@ export default function SoundsScreen() {
       console.log(`📦 Loading sound ${soundItem.id} (${soundItem.name})...`);
 
       // Get source using sound cache - prioritize playback if not cached
-      const source = await soundCache.getSource(soundItem, true, true);
+      // Add timeout to prevent hanging in offline mode
+      let source: any;
+      try {
+        const sourcePromise = soundCache.getSource(soundItem, true, true);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Source load timeout")), 5000)
+        );
+        source = await Promise.race([sourcePromise, timeoutPromise]);
+      } catch (error) {
+        console.warn(
+          `⚠️ Failed to get sound source (likely offline): ${error}`
+        );
+        // In offline mode, if no cached version available, can't play
+        throw new Error(
+          `Cannot load ${soundItem.name} - check your internet connection or download it for offline use`
+        );
+      }
 
       // Register callback for when download completes (background caching)
       if (!soundCache.isDownloaded(soundItem.id)) {
@@ -1423,7 +1588,7 @@ export default function SoundsScreen() {
               );
               if (sound) {
                 showSnackbar(`${sound.name} saved for offline`);
-                Analytics.trackSoundDownloaded(completedId, sound.name);
+                safeAnalytics.trackSoundDownloaded(completedId, sound.name);
               }
             } else {
               const sound = WHITE_NOISE_SOUNDS.find(
@@ -1446,18 +1611,33 @@ export default function SoundsScreen() {
         });
       }
 
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        source,
-        {
-          isLooping: true,
-          volume: 0, // Start at 0, we'll fade in after playback starts
-          shouldPlay: false,
-          progressUpdateIntervalMillis: 1000,
-          androidImplementation: "MediaPlayer",
-        },
-        undefined, // No status callback during load - we'll set it after
-        false // Don't download entire file before playing
-      );
+      // Create sound with timeout protection
+      let newSound: Audio.Sound;
+      try {
+        const createPromise = Audio.Sound.createAsync(
+          source,
+          {
+            isLooping: true,
+            volume: 0, // Start at 0, we'll fade in after playback starts
+            shouldPlay: false,
+            progressUpdateIntervalMillis: 1000,
+            androidImplementation: "MediaPlayer",
+          },
+          undefined, // No status callback during load - we'll set it after
+          false // Don't download entire file before playing
+        );
+        const timeoutPromise = new Promise<{ sound: Audio.Sound }>(
+          (_, reject) =>
+            setTimeout(() => reject(new Error("Sound creation timeout")), 8000)
+        );
+        const result = await Promise.race([createPromise, timeoutPromise]);
+        newSound = result.sound;
+      } catch (error) {
+        console.error(`❌ Failed to create sound object: ${error}`);
+        throw new Error(
+          `Could not load ${soundItem.name}. Check internet connection or download for offline.`
+        );
+      }
 
       console.log(`✅ Sound ${soundItem.id} (${soundItem.name}) loaded`);
 
@@ -1481,7 +1661,7 @@ export default function SoundsScreen() {
 
     if (soundItem.premium && !pro) {
       console.log("Opening paywall for premium sound");
-      Analytics.trackPaywallViewed("premium_sound");
+      safeAnalytics.trackPaywallViewed("premium_sound");
       setPaywallOpen(true);
       return;
     }
@@ -1489,7 +1669,7 @@ export default function SoundsScreen() {
     console.log("Playing sound");
 
     // Track sound played
-    Analytics.trackSoundPlayed(
+    safeAnalytics.trackSoundPlayed(
       soundItem.id,
       soundItem.name,
       soundItem.premium,
@@ -1536,19 +1716,9 @@ export default function SoundsScreen() {
         500
       );
 
-      // Set up playback status listener
-      soundData.sound.setOnPlaybackStatusUpdate((status) => {
-        if ((status as any).isLoaded) {
-          setIsPlaying((status as any).isPlaying);
-
-          if (
-            (status as any).isPlaying === false &&
-            !(status as any).didJustFinish
-          ) {
-            console.log("⚠️ Audio interrupted or paused by system");
-          }
-        }
-      });
+      // ✅ Playback status tracking handled by usePlaybackStatusPolling hook
+      // Removed setOnPlaybackStatusUpdate callback - unreliable on Android SDK 51+
+      // The polling hook provides reliable cross-platform status updates
 
       // Update state atomically
       const newActiveSounds = new Map();
@@ -1591,7 +1761,7 @@ export default function SoundsScreen() {
     }
     setIsPlaying(false);
 
-    Analytics.trackSoundPaused();
+    safeAnalytics.trackSoundPaused();
 
     if (activeSounds.size > 0) {
       const firstSound = Array.from(activeSounds.values())[0];
@@ -1622,7 +1792,7 @@ export default function SoundsScreen() {
       }
       setIsPlaying(true);
 
-      Analytics.trackSoundResumed();
+      safeAnalytics.trackSoundResumed();
 
       if (activeSounds.size > 0) {
         const firstSound = Array.from(activeSounds.values())[0];
@@ -1703,7 +1873,7 @@ export default function SoundsScreen() {
       }
 
       if (soundCount > 0) {
-        Analytics.trackAllSoundsStopped(soundCount);
+        safeAnalytics.trackAllSoundsStopped(soundCount);
       }
 
       try {
@@ -1769,9 +1939,9 @@ export default function SoundsScreen() {
 
   const handleSetTimer = useCallback((minutes: number | null) => {
     if (minutes === null) {
-      Analytics.trackTimerCleared();
+      safeAnalytics.trackTimerCleared();
     } else {
-      Analytics.trackTimerSet(minutes);
+      safeAnalytics.trackTimerSet(minutes);
     }
     setTimerMinutes(minutes);
     setTimerSeconds(minutes ? minutes * 60 : 0);
@@ -2195,7 +2365,7 @@ export default function SoundsScreen() {
             ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Analytics.trackCategorySelected("Favourites", favorites.size);
+              safeAnalytics.trackCategorySelected("Favourites", favorites.size);
               setSelectedCategory("Favourites");
             }}
           >
@@ -2241,7 +2411,7 @@ export default function SoundsScreen() {
             ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Analytics.trackCategorySelected(
+              safeAnalytics.trackCategorySelected(
                 "Downloaded",
                 downloadedSounds.size
               );
@@ -2290,7 +2460,7 @@ export default function SoundsScreen() {
             ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Analytics.trackCategorySelected(
+              safeAnalytics.trackCategorySelected(
                 category,
                 WHITE_NOISE_SOUNDS.filter(
                   (s) =>

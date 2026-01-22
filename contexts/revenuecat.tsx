@@ -75,26 +75,57 @@ export const RevenueCatProvider = ({
           updateCustomerInfo(info);
         });
 
-        // Get initial customer info
-        const info = await Purchases.getCustomerInfo();
-        updateCustomerInfo(info);
-
-        // Get available offerings
-        const fetchedOfferings = await Purchases.getOfferings();
-        if (fetchedOfferings.current) {
-          setOfferings(fetchedOfferings.current);
-          console.log(
-            "📦 Loaded offerings:",
-            fetchedOfferings.current.availablePackages.length,
-            "packages"
+        // Get initial customer info with timeout for offline scenarios
+        try {
+          const infoPromise = Purchases.getCustomerInfo();
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout")), 3000)
           );
-        } else {
-          console.warn("⚠️ No current offering found");
+          const info = await Promise.race([infoPromise, timeoutPromise]);
+          updateCustomerInfo(info as CustomerInfo);
+        } catch (infoError) {
+          console.warn(
+            "⚠️ Could not fetch customer info (likely offline):",
+            infoError
+          );
+          // Offline mode: default to free tier, user can restore purchases when online
+          setIsPro(false);
+        }
+
+        // Get available offerings with timeout for offline scenarios
+        try {
+          const offeringsPromise = Purchases.getOfferings();
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout")), 3000)
+          );
+          const fetchedOfferings = await Promise.race([
+            offeringsPromise,
+            timeoutPromise,
+          ]);
+          const off = fetchedOfferings as any;
+          if (off.current) {
+            setOfferings(off.current);
+            console.log(
+              "📦 Loaded offerings:",
+              off.current.availablePackages.length,
+              "packages"
+            );
+          } else {
+            console.warn("⚠️ No current offering found");
+          }
+        } catch (offeringError) {
+          console.warn(
+            "⚠️ Could not fetch offerings (likely offline):",
+            offeringError
+          );
+          // Offline mode: offerings will be null, but app continues to work
         }
 
         setIsLoading(false);
       } catch (error) {
         console.error("❌ Error initializing RevenueCat:", error);
+        console.log("✈️  Operating in offline/free mode");
+        setIsPro(false);
         setIsLoading(false);
       }
     };

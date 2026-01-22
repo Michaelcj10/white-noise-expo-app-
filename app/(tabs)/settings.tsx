@@ -8,10 +8,13 @@ import { useTheme } from "@/contexts/themecontext";
 import { Analytics } from "@/utils/analytics";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Modal,
@@ -55,7 +58,7 @@ export default function SettingsScreen() {
   const { setScrollViewRef } = useScroll();
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const { isPro: pro } = useRevenueCat();
+  const { isPro: pro, restorePurchases } = useRevenueCat();
   const [favoriteSoundId, setFavoriteSoundId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [aboutModalVisible, setAboutModalVisible] = useState(false);
@@ -73,6 +76,7 @@ export default function SettingsScreen() {
   const [confirmClearFavoritesVisible, setConfirmClearFavoritesVisible] =
     useState(false);
   const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [isRestoringPurchases, setIsRestoringPurchases] = useState(false);
   const [infoModalContent, setInfoModalContent] = useState({
     title: "",
     message: "",
@@ -135,6 +139,22 @@ export default function SettingsScreen() {
     }, [])
   );
 
+  const triggerHaptic = (type: "light" | "medium" | "heavy" = "light") => {
+    if (Platform.OS !== "web") {
+      switch (type) {
+        case "light":
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          break;
+        case "medium":
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          break;
+        case "heavy":
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          break;
+      }
+    }
+  };
+
   const SettingItem = ({
     icon,
     title,
@@ -151,7 +171,10 @@ export default function SettingsScreen() {
         styles.settingItem,
         { backgroundColor: theme.surface, borderColor: theme.border },
       ]}
-      onPress={onPress}
+      onPress={() => {
+        triggerHaptic("light");
+        onPress?.();
+      }}
       activeOpacity={0.7}
     >
       <View style={[styles.settingIcon, { backgroundColor: color }]}>
@@ -172,7 +195,10 @@ export default function SettingsScreen() {
       {hasSwitch && (
         <Switch
           value={switchValue}
-          onValueChange={onSwitchChange}
+          onValueChange={(value) => {
+            triggerHaptic("medium");
+            onSwitchChange?.(value);
+          }}
           trackColor={{ false: theme.switchTrackOff, true: theme.primary }}
           thumbColor={switchValue ? "#ffffff" : theme.switchThumbOff}
         />
@@ -228,6 +254,50 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const handleTermsPress = () => {
+    Linking.openURL("https://slumbr.space/terms");
+  };
+
+  const handlePrivacyPress = () => {
+    Linking.openURL("https://slumbr.space/privacy");
+  };
+
+  const handleRestorePurchases = async () => {
+    setIsRestoringPurchases(true);
+    triggerHaptic("medium");
+    try {
+      const result = await restorePurchases();
+      triggerHaptic("heavy");
+      if (result.success) {
+        setInfoModalContent({
+          title: "Purchases Restored",
+          message: "Your purchases have been successfully restored.",
+          icon: "checkmark-circle",
+        });
+      } else {
+        setInfoModalContent({
+          title: "No Purchases Found",
+          message:
+            "No previous purchases were found for this account. If you believe this is an error, please contact support.",
+          icon: "information-circle",
+        });
+      }
+      setInfoModalVisible(true);
+    } catch (error) {
+      console.error("Error restoring purchases:", error);
+      triggerHaptic("heavy");
+      setInfoModalContent({
+        title: "Restore Failed",
+        message:
+          "There was an error restoring your purchases. Please try again.",
+        icon: "alert-circle",
+      });
+      setInfoModalVisible(true);
+    } finally {
+      setIsRestoringPurchases(false);
+    }
+  };
+
   const handleSelectFavorite = async (id: number) => {
     const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === id);
     if (!sound) return;
@@ -245,6 +315,7 @@ export default function SettingsScreen() {
 
   const confirmQuickPlaySelection = async () => {
     if (!selectedSoundForConfirm) return;
+    triggerHaptic("medium");
 
     await Storage.setItem(
       "favorite_sound_id",
@@ -267,6 +338,7 @@ export default function SettingsScreen() {
   };
 
   const confirmClearQuickPlay = async () => {
+    triggerHaptic("heavy");
     await Storage.setItem("favorite_sound_id", "");
     setFavoriteSoundId(null);
     setConfirmClearQuickPlayVisible(false);
@@ -295,6 +367,7 @@ export default function SettingsScreen() {
   };
 
   const confirmClearFavorites = async () => {
+    triggerHaptic("heavy");
     await Storage.setItem(FAVORITES_KEY, JSON.stringify([]));
     setFavoritesCount(0);
     setConfirmClearFavoritesVisible(false);
@@ -466,6 +539,22 @@ export default function SettingsScreen() {
           showArrow={true}
           color={theme.secondary}
         />
+        <SettingItem
+          icon="document-text"
+          title="Terms & Policy"
+          description="Read our terms and privacy policy"
+          onPress={handleTermsPress}
+          showArrow={true}
+          color={theme.primary}
+        />
+        <SettingItem
+          icon="shield-checkmark"
+          title="Privacy Policy"
+          description="Learn how we protect your data"
+          onPress={handlePrivacyPress}
+          showArrow={true}
+          color={theme.primary}
+        />
 
         {!pro && (
           <TouchableOpacity
@@ -534,7 +623,87 @@ export default function SettingsScreen() {
             >
               You have access to all premium sounds and features.
             </Text>
+            <TouchableOpacity
+              onPress={handleRestorePurchases}
+              disabled={isRestoringPurchases}
+              style={{
+                backgroundColor: isRestoringPurchases ? "#FFD70080" : "#FFD700",
+                padding: 12,
+                borderRadius: 8,
+                alignItems: "center",
+                marginTop: 8,
+              }}
+            >
+              {isRestoringPurchases ? (
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <ActivityIndicator color="#1a1a1a" size="small" />
+                  <Text
+                    style={{
+                      color: "#1a1a1a",
+                      fontSize: 14,
+                      fontWeight: "600",
+                      marginLeft: 8,
+                    }}
+                  >
+                    Restoring...
+                  </Text>
+                </View>
+              ) : (
+                <Text
+                  style={{
+                    color: "#1a1a1a",
+                    fontSize: 14,
+                    fontWeight: "600",
+                  }}
+                >
+                  Restore Purchases
+                </Text>
+              )}
+            </TouchableOpacity>
           </View>
+        )}
+
+        {!pro && (
+          <TouchableOpacity
+            onPress={handleRestorePurchases}
+            disabled={isRestoringPurchases}
+            style={{
+              padding: 12,
+              borderRadius: 12,
+              marginTop: 16,
+              marginHorizontal: 16,
+              backgroundColor: isRestoringPurchases ? theme.border : theme.card,
+              borderWidth: 1,
+              borderColor: theme.border,
+              alignItems: "center",
+            }}
+          >
+            {isRestoringPurchases ? (
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <ActivityIndicator color={theme.text} size="small" />
+                <Text
+                  style={{
+                    color: theme.text,
+                    fontSize: 14,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
+                >
+                  Restoring...
+                </Text>
+              </View>
+            ) : (
+              <Text
+                style={{
+                  color: theme.text,
+                  fontSize: 14,
+                  fontWeight: "600",
+                }}
+              >
+                Restore Purchases
+              </Text>
+            )}
+          </TouchableOpacity>
         )}
 
         <View style={styles.footer}>
