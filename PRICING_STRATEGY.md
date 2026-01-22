@@ -116,7 +116,7 @@ Package Type: LIFETIME
 │     Upgrade to Slumbr Pro   │ ← Header
 │  Even free has no ads      │
 ├─────────────────────────────┤
-│  ✓ Access 44 premium sounds │ ← Features List
+│  ✓ Access 50 premium sounds │ ← Features List
 │  ✓ Advanced mixing          │
 │  ✓ Enhanced offline mode    │
 │  ✓ Support development      │

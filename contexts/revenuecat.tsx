@@ -55,14 +55,40 @@ export const RevenueCatProvider = ({
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [offerings, setOfferings] = useState<PurchasesOffering | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
 
   useEffect(() => {
     const initializePurchases = async () => {
+      // Skip RevenueCat initialization on web - SDK not supported on web
+      if (Platform.OS === "web") {
+        console.log(
+          "🌐 Web platform detected - RevenueCat SDK not available on web"
+        );
+        console.log(
+          "✈️  Operating in offline/free mode (web doesn't support native billing)"
+        );
+        setIsPro(false);
+        setIsLoading(false);
+        return;
+      }
+
       try {
+        console.log(
+          `🚀 Starting RevenueCat initialization... (Attempt ${retryCount + 1}/${MAX_RETRIES + 1})`
+        );
+        console.log("📱 Platform:", Platform.OS);
+        console.log(
+          "🔑 API Key:",
+          REVENUECAT_CONFIG.apiKey ? "✓ Present" : "✗ Missing"
+        );
+
         // Enable debug logs for development (set to ERROR for production)
         Purchases.setLogLevel(LOG_LEVEL.DEBUG);
+        console.log("📝 Debug logging enabled");
 
         // Configure Purchases with the API key
+        console.log("⚙️ Configuring Purchases with API key...");
         await Purchases.configure({
           apiKey: REVENUECAT_CONFIG.apiKey,
         });
@@ -122,8 +148,28 @@ export const RevenueCatProvider = ({
         }
 
         setIsLoading(false);
-      } catch (error) {
-        console.error("❌ Error initializing RevenueCat:", error);
+      } catch (error: any) {
+        console.error("❌ Error initializing RevenueCat");
+        console.error("   Error type:", error?.name || typeof error);
+        console.error("   Error message:", error?.message || error);
+        console.error("   Full error:", error);
+
+        // Retry logic for API key errors
+        if (
+          retryCount < MAX_RETRIES &&
+          (error?.message?.includes("Invalid API key") ||
+            error?.message?.includes("401") ||
+            error?.message?.includes("Unauthorized"))
+        ) {
+          console.log(
+            `⏳ Retrying initialization in 2 seconds... (${retryCount + 1}/${MAX_RETRIES})`
+          );
+          setTimeout(() => {
+            setRetryCount(retryCount + 1);
+          }, 2000);
+          return;
+        }
+
         console.log("✈️  Operating in offline/free mode");
         setIsPro(false);
         setIsLoading(false);
@@ -131,7 +177,7 @@ export const RevenueCatProvider = ({
     };
 
     initializePurchases();
-  }, []);
+  }, [retryCount]);
 
   const updateCustomerInfo = (info: CustomerInfo) => {
     setCustomerInfo(info);

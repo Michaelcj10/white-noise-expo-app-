@@ -105,7 +105,6 @@ Your Slumbr app now has a fully functional RevenueCat integration with the follo
 ### Step 1: Configure RevenueCat Dashboard
 
 1. **Create Products** in RevenueCat:
-
    - Go to https://app.revenuecat.com
    - Navigate to Products
    - Create 3 products:
@@ -114,13 +113,11 @@ Your Slumbr app now has a fully functional RevenueCat integration with the follo
      - `lifetime` - Lifetime purchase
 
 2. **Create Offering**:
-
    - Go to Offerings
    - Create "default" offering
    - Add all 3 products to the offering
 
 3. **Create Entitlement**:
-
    - Go to Entitlements
    - Create entitlement: `slumbr Pro`
    - Attach all 3 products to this entitlement
@@ -291,19 +288,16 @@ Monitor in real-time:
 ### Common Issues
 
 1. **"No offerings found"**
-
    - Check RevenueCat dashboard has offerings configured
    - Verify API key is correct
    - Check network connection
 
 2. **"Purchase failed"**
-
    - Verify products exist in App Store/Play Store
    - Check bundle ID matches
    - Ensure sandbox account is signed in (testing)
 
 3. **"Restore found nothing"**
-
    - User may not have previous purchases
    - Check they're using correct Apple/Google account
    - Verify purchases weren't refunded
@@ -328,20 +322,17 @@ Monitor in real-time:
 ## 🚀 Next Steps
 
 1. **Create Real Products**:
-
    - Set pricing in App Store Connect
    - Configure products in Google Play Console
    - Link to RevenueCat
 
 2. **Test All Flows**:
-
    - New purchase
    - Restore purchases
    - Subscription renewal
    - Cancellation
 
 3. **Monitor Launch**:
-
    - Watch RevenueCat dashboard
    - Check for errors in logs
    - Monitor user feedback
@@ -372,7 +363,7 @@ Monitor in real-time:
 - ✅ Purchase monthly, yearly, or lifetime access
 - ✅ Restore purchases on new devices
 - ✅ See subscription status in settings
-- ✅ Access all 21 premium sounds with pro
+- ✅ Access all 50 premium sounds with pro
 
 ### What You Can Track:
 

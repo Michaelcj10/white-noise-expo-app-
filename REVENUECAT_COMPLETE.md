@@ -78,11 +78,12 @@ Your app is ready for these products:
 
 **Features List Displayed**:
 
-- Access to all 21 premium sounds
+- Access to all 50 premium sounds
 - Offline mode for all sounds
 - Unlimited sound mixing
 - Advanced timer options
 - Perfect for sleep and focus
+- 56 total sounds (6 free + 50 premium)
 - No ads ever
 
 ### 3. Settings Integration (`app/(tabs)/settings.tsx`)
@@ -147,7 +148,6 @@ Your app is ready for these products:
 ### What to Test:
 
 1. **New Purchase**:
-
    - Tap premium sound
    - Paywall appears
    - Select package
@@ -155,7 +155,6 @@ Your app is ready for these products:
    - Premium unlocks
 
 2. **Restore Purchases**:
-
    - Reinstall app
    - Tap "Restore Purchases"
    - Premium access restored
@@ -188,19 +187,16 @@ Your app is ready for these products:
 1. **Login**: https://app.revenuecat.com
 
 2. **Create Products**:
-
    - Product ID: `monthly`, Type: Subscription
    - Product ID: `yearly`, Type: Subscription
    - Product ID: `lifetime`, Type: Non-consumable
 
 3. **Create Offering**:
-
    - Name: `default`
    - Add all 3 products
    - Set as current offering
 
 4. **Create Entitlement**:
-
    - Name: `slumbr Pro`
    - Attach all 3 products
 
@@ -215,7 +211,6 @@ Your app is ready for these products:
 Created comprehensive guides:
 
 1. **REVENUECAT_INTEGRATION.md** - Full technical documentation
-
    - Implementation details
    - Testing instructions
    - Troubleshooting guide
@@ -268,7 +263,7 @@ Purchases.setLogLevel(LOG_LEVEL.ERROR); // Change from DEBUG
 
 ### Pro Users:
 
-- ✨ All 21 premium sounds
+- ✨ All 50 premium sounds
 - ✨ Offline mode
 - ✨ Unlimited mixing
 - ✨ Advanced features

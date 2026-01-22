@@ -1,10 +1,12 @@
 // app/(tabs)/settings.tsx
 import { PaywallModal } from "@/components/PaywallModal";
 import { WHITE_NOISE_SOUNDS } from "@/constants/sound";
+import { useAccessibility } from "@/contexts/accessibility";
 import { useBackgroundPlay } from "@/contexts/backgroundplay";
 import { useRevenueCat } from "@/contexts/revenuecat";
 import { useScroll } from "@/contexts/scroll";
-import { useTheme } from "@/contexts/themecontext";
+import { themes, useTheme } from "@/contexts/themecontext";
+
 import { Analytics } from "@/utils/analytics";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -51,12 +53,36 @@ const Storage = {
 
 const FAVORITES_KEY = "favorite_sound_ids";
 
+const getHighContrastTheme = (baseTheme: typeof themes.dark) => ({
+  ...baseTheme,
+  background: "#000000",
+  surface: "#000000",
+  card: "#000000",
+  border: "#ffffff",
+  tabBarBorder: "#ffffff",
+  text: "#ffffff",
+  sectionHeader: "#ffffff",
+  tabBar: "#000000",
+  switchTrackOff: "#333333",
+  switchThumbOff: "#ffffff",
+});
+
 export default function SettingsScreen() {
-  const { theme, themeMode, toggleTheme } = useTheme();
+  const { theme: baseTheme, themeMode, toggleTheme } = useTheme();
   const { backgroundPlayEnabled, setBackgroundPlayEnabled } =
     useBackgroundPlay();
   const { setScrollViewRef } = useScroll();
   const scrollViewRef = useRef<ScrollView>(null);
+  const {
+    textSize,
+    highContrastMode,
+    setTextSize,
+    setHighContrastMode,
+    notificationsEnabled,
+    autoCheckUpdates,
+    setNotificationsEnabled,
+    setAutoCheckUpdates,
+  } = useAccessibility();
 
   const { isPro: pro, restorePurchases } = useRevenueCat();
   const [favoriteSoundId, setFavoriteSoundId] = useState<string | null>(null);
@@ -77,11 +103,28 @@ export default function SettingsScreen() {
     useState(false);
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [isRestoringPurchases, setIsRestoringPurchases] = useState(false);
+  const [accessibilityModalVisible, setAccessibilityModalVisible] =
+    useState(false);
   const [infoModalContent, setInfoModalContent] = useState({
     title: "",
     message: "",
     icon: "information-circle" as keyof typeof Ionicons.glyphMap,
   });
+
+  // Use high contrast theme if enabled
+  const theme = highContrastMode ? getHighContrastTheme(baseTheme) : baseTheme;
+
+  // Helper function to apply text size multiplier
+  const getScaledFontSize = (baseSize: number): number => {
+    switch (textSize) {
+      case "small":
+        return Math.round(baseSize * 0.85);
+      case "large":
+        return Math.round(baseSize * 1.15);
+      default:
+        return baseSize;
+    }
+  };
 
   // Load saved favourite + pro entitlement + favorites count
   useEffect(() => {
@@ -181,12 +224,20 @@ export default function SettingsScreen() {
         <Ionicons name={icon} size={20} color="white" />
       </View>
       <View style={styles.settingContent}>
-        <Text style={[styles.settingTitle, { color: theme.text }]}>
+        <Text
+          style={[
+            styles.settingTitle,
+            { color: theme.text, fontSize: getScaledFontSize(16) },
+          ]}
+        >
           {title}
         </Text>
         {description && (
           <Text
-            style={[styles.settingDescription, { color: theme.textSecondary }]}
+            style={[
+              styles.settingDescription,
+              { color: theme.textSecondary, fontSize: getScaledFontSize(14) },
+            ]}
           >
             {description}
           </Text>
@@ -260,6 +311,24 @@ export default function SettingsScreen() {
 
   const handlePrivacyPress = () => {
     Linking.openURL("https://slumbr.space/privacy");
+  };
+
+  const handleTextSizeChange = async (size: "small" | "normal" | "large") => {
+    triggerHaptic("light");
+    await setTextSize(size);
+  };
+
+  const handleHighContrastToggle = async (enabled: boolean) => {
+    triggerHaptic("medium");
+    await setHighContrastMode(enabled);
+    setInfoModalContent({
+      title: enabled ? "High Contrast Enabled" : "High Contrast Disabled",
+      message: enabled
+        ? "Text and buttons now have higher contrast for better visibility."
+        : "Text contrast has been returned to normal.",
+      icon: "checkmark-circle",
+    });
+    setInfoModalVisible(true);
   };
 
   const handleRestorePurchases = async () => {
@@ -514,6 +583,80 @@ export default function SettingsScreen() {
           color={theme.error}
         />
 
+        <SectionHeader title="Accessibility" />
+        <SettingItem
+          icon="contrast"
+          title="High Contrast"
+          description="Increase contrast for better readability"
+          hasSwitch={true}
+          switchValue={highContrastMode}
+          onSwitchChange={handleHighContrastToggle}
+          color={highContrastMode ? theme.primary : theme.surface}
+        />
+
+        <TouchableOpacity
+          style={[
+            styles.settingItem,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+          onPress={() => {
+            triggerHaptic("light");
+            setAccessibilityModalVisible(true);
+          }}
+          activeOpacity={0.7}
+        >
+          <View
+            style={[styles.settingIcon, { backgroundColor: theme.primary }]}
+          >
+            <Ionicons name="text" size={20} color="white" />
+          </View>
+          <View style={styles.settingContent}>
+            <Text style={[styles.settingTitle, { color: theme.text }]}>
+              Text Size
+            </Text>
+            <Text
+              style={[
+                styles.settingDescription,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Current: {textSize.charAt(0).toUpperCase() + textSize.slice(1)}
+            </Text>
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={theme.textSecondary}
+          />
+        </TouchableOpacity>
+
+        <SectionHeader title="Notifications & Updates" />
+        <SettingItem
+          icon="notifications"
+          title="Notifications"
+          description={notificationsEnabled ? "Enabled" : "Disabled"}
+          hasSwitch={true}
+          switchValue={notificationsEnabled}
+          onSwitchChange={(value: boolean) => {
+            triggerHaptic("medium");
+            setNotificationsEnabled(value);
+          }}
+          color={notificationsEnabled ? theme.primary : theme.surface}
+        />
+
+        <SettingItem
+          icon="refresh-circle"
+          title="Auto-Check for Updates"
+          description={autoCheckUpdates ? "Enabled" : "Disabled"}
+          hasSwitch={true}
+          switchValue={autoCheckUpdates}
+          onSwitchChange={(value: boolean) => {
+            triggerHaptic("medium");
+            setAutoCheckUpdates(value);
+          }}
+          color={autoCheckUpdates ? theme.primary : theme.surface}
+        />
+
         <SectionHeader title="Support" />
         <SettingItem
           icon="star"
@@ -715,6 +858,145 @@ export default function SettingsScreen() {
           />
         </View>
       </ScrollView>
+
+      {/* Text Size Modal */}
+      <Modal
+        visible={accessibilityModalVisible}
+        animationType="fade"
+        transparent
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              maxWidth: 400,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            <View style={{ marginBottom: 20 }}>
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: "700",
+                  color: theme.text,
+                  marginBottom: 16,
+                  textAlign: "center",
+                }}
+              >
+                Select Text Size
+              </Text>
+
+              {(["small", "normal", "large"] as const).map((size) => (
+                <TouchableOpacity
+                  key={size}
+                  onPress={() => handleTextSizeChange(size)}
+                  style={{
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    marginBottom: 12,
+                    borderRadius: 12,
+                    borderWidth: 2,
+                    borderColor:
+                      textSize === size ? theme.primary : theme.border,
+                    backgroundColor:
+                      textSize === size ? theme.primary + "15" : theme.card,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      borderWidth: 2,
+                      borderColor: theme.primary,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: 12,
+                    }}
+                  >
+                    {textSize === size && (
+                      <View
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: theme.primary,
+                        }}
+                      />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize:
+                          size === "small" ? 14 : size === "large" ? 18 : 16,
+                        fontWeight: "600",
+                        color: theme.text,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {size.charAt(0).toUpperCase() + size.slice(1)}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize:
+                          size === "small" ? 11 : size === "large" ? 14 : 12,
+                        color: theme.textSecondary,
+                      }}
+                    >
+                      {size === "small"
+                        ? "Compact text for more content"
+                        : size === "large"
+                          ? "Larger text for easier reading"
+                          : "Default text size"}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                triggerHaptic("light");
+                setAccessibilityModalVisible(false);
+              }}
+              style={{
+                backgroundColor: theme.primary,
+                padding: 16,
+                borderRadius: 12,
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: "white",
+                  fontSize: 16,
+                  fontWeight: "600",
+                }}
+              >
+                Done
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Quick Play Sound Modal */}
       <Modal visible={modalVisible} animationType="slide">
@@ -1399,7 +1681,11 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { padding: 20, alignItems: "center" },
-  title: { fontSize: 28, fontWeight: "bold", marginBottom: 4 },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 4,
+  },
   subtitle: { fontSize: 16 },
   content: { flex: 1, paddingHorizontal: 20 },
   sectionHeader: {
@@ -1432,7 +1718,11 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   settingContent: { flex: 1 },
-  settingTitle: { fontSize: 16, fontWeight: "600", marginBottom: 2 },
+  settingTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
   settingDescription: { fontSize: 14, lineHeight: 18 },
   footer: { alignItems: "center", paddingVertical: 40, paddingBottom: 100 },
   footerLogo: {

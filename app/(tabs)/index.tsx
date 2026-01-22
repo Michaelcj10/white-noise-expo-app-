@@ -13,6 +13,7 @@ import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import * as Haptics from "expo-haptics";
 import * as Network from "expo-network";
 
+import { useAccessibility } from "@/contexts/accessibility";
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useRevenueCat } from "@/contexts/revenuecat";
 import { useScroll } from "@/contexts/scroll";
@@ -38,7 +39,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBackgroundPlay } from "../../contexts/backgroundplay";
-import { useTheme } from "../../contexts/themecontext";
+import { themes, useTheme } from "../../contexts/themecontext";
 import {
   hidePlayingNotification,
   NOTIFICATION_ACTIONS,
@@ -51,6 +52,20 @@ const isWeb = Platform.OS === "web";
 
 /* ---------- Storage (web-safe) ---------- */
 const FAVORITES_KEY = "favorite_sound_ids";
+
+const getHighContrastTheme = (baseTheme: typeof themes.dark) => ({
+  ...baseTheme,
+  background: "#000000",
+  surface: "#000000",
+  card: "#000000",
+  border: "#ffffff",
+  tabBarBorder: "#ffffff",
+  text: "#ffffff",
+  sectionHeader: "#ffffff",
+  tabBar: "#000000",
+  switchTrackOff: "#333333",
+  switchThumbOff: "#ffffff",
+});
 
 const Storage = {
   async getItem(key: string) {
@@ -701,7 +716,7 @@ const safeAnalytics = {
 
 /* ================== MAIN SCREEN ================== */
 export default function SoundsScreen() {
-  const { theme, themeMode } = useTheme();
+  const { theme: baseTheme, themeMode } = useTheme();
   const { backgroundPlayEnabled } = useBackgroundPlay();
   const {
     isQuickPlaying,
@@ -712,6 +727,22 @@ export default function SoundsScreen() {
   const { setScrollViewRef } = useScroll();
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
+  const { textSize, highContrastMode } = useAccessibility();
+
+  // Use high contrast theme if enabled
+  const theme = highContrastMode ? getHighContrastTheme(baseTheme) : baseTheme;
+
+  // Helper function to apply text size multiplier
+  const getScaledFontSize = (baseSize: number): number => {
+    switch (textSize) {
+      case "small":
+        return Math.round(baseSize * 0.85);
+      case "large":
+        return Math.round(baseSize * 1.15);
+      default:
+        return baseSize;
+    }
+  };
 
   // Multiple sounds support
   const [activeSounds, setActiveSounds] = useState<
@@ -2108,7 +2139,12 @@ export default function SoundsScreen() {
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
               >
-                <Text style={[styles.soundName, { color: theme.text }]}>
+                <Text
+                  style={[
+                    styles.soundName,
+                    { color: theme.text, fontSize: getScaledFontSize(18) },
+                  ]}
+                >
                   {soundItem.name}
                 </Text>
                 {favoriteSoundId === String(soundItem.id) && (
@@ -2136,7 +2172,10 @@ export default function SoundsScreen() {
               <Text
                 style={[
                   styles.soundDescription,
-                  { color: theme.textSecondary },
+                  {
+                    color: theme.textSecondary,
+                    fontSize: getScaledFontSize(14),
+                  },
                 ]}
               >
                 {soundItem.description}
@@ -2648,10 +2687,10 @@ export default function SoundsScreen() {
                       {activeSounds.size > 0
                         ? Array.from(activeSounds.values())[0]?.soundItem?.name
                         : selectedSounds.size > 0
-                        ? WHITE_NOISE_SOUNDS.find(
-                            (s) => s.id === Array.from(selectedSounds)[0]
-                          )?.name
-                        : "No sound"}
+                          ? WHITE_NOISE_SOUNDS.find(
+                              (s) => s.id === Array.from(selectedSounds)[0]
+                            )?.name
+                          : "No sound"}
                     </Text>
                     {activeSounds.size > 1 && (
                       <View
@@ -2763,15 +2802,15 @@ export default function SoundsScreen() {
                     selectedSounds.size > 0 && activeSounds.size === 0
                       ? undefined
                       : isPlaying
-                      ? pauseAllSounds
-                      : resumeAllSounds
+                        ? pauseAllSounds
+                        : resumeAllSounds
                   }
                   iconName={
                     selectedSounds.size > 0 && activeSounds.size === 0
                       ? "hourglass"
                       : isPlaying
-                      ? "pause"
-                      : "play"
+                        ? "pause"
+                        : "play"
                   }
                   size={20}
                   style={{
@@ -2963,7 +3002,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     height: 65,
   },
-  title: { fontSize: 28, fontWeight: "bold", marginBottom: 8 },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
   categoryTabs: {
     paddingBottom: 6,
     maxHeight: 50,

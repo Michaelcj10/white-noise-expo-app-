@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AccessibilityProvider } from "../contexts/accessibility";
 import { ThemeProvider } from "../contexts/themecontext";
 
 import { MIXPANEL_TOKEN } from "@/constants/analytics";
@@ -91,26 +92,28 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider style={{ backgroundColor: "#0A0903" }}>
       <ThemeProvider>
-        <RevenueCatProvider>
-          <BackgroundPlayProvider>
-            <QuickPlayProvider>
-              <ScrollProvider>
-                <Stack
-                  screenOptions={{
-                    contentStyle: { backgroundColor: "#0A0903" },
-                  }}
-                >
-                  <Stack.Screen
-                    name="(tabs)"
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen name="+not-found" />
-                </Stack>
-                <StatusBar style="auto" />
-              </ScrollProvider>
-            </QuickPlayProvider>
-          </BackgroundPlayProvider>
-        </RevenueCatProvider>
+        <AccessibilityProvider>
+          <RevenueCatProvider>
+            <BackgroundPlayProvider>
+              <QuickPlayProvider>
+                <ScrollProvider>
+                  <Stack
+                    screenOptions={{
+                      contentStyle: { backgroundColor: "#0A0903" },
+                    }}
+                  >
+                    <Stack.Screen
+                      name="(tabs)"
+                      options={{ headerShown: false }}
+                    />
+                    <Stack.Screen name="+not-found" />
+                  </Stack>
+                  <StatusBar style="auto" />
+                </ScrollProvider>
+              </QuickPlayProvider>
+            </BackgroundPlayProvider>
+          </RevenueCatProvider>
+        </AccessibilityProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
