@@ -357,7 +357,11 @@ export default function TabLayout() {
           redirect={false}
           name="panic"
           options={{
-            title: favoriteSoundId ? "Quick Play" : "Set Quick Play",
+            title: favoriteSoundId
+              ? WHITE_NOISE_SOUNDS.find(
+                  (s) => String(s.id) === favoriteSoundId,
+                )?.name.substring(0, 12) || "Quick Play"
+              : "Set Quick Play",
             tabBarIcon: ({ color, focused }) => <PanicButton />,
           }}
           listeners={{

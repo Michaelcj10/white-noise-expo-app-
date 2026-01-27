@@ -7,12 +7,91 @@ export const SOUND_CATEGORIES = {
 } as const;
 
 export const CATEGORY_COLORS = {
-  [SOUND_CATEGORIES.ALL]: "#0ea5e9",
-  [SOUND_CATEGORIES.NATURE]: "#10b981",
-  [SOUND_CATEGORIES.URBAN]: "#3b82f6",
-  [SOUND_CATEGORIES.AMBIENT]: "#06b6d4",
-  [SOUND_CATEGORIES.SLEEP]: "#0d9488",
+  // Icons with transparent backgrounds
+  [SOUND_CATEGORIES.ALL]: "transparent",
+  [SOUND_CATEGORIES.NATURE]: "transparent",
+  [SOUND_CATEGORIES.URBAN]: "transparent",
+  [SOUND_CATEGORIES.AMBIENT]: "transparent",
+  [SOUND_CATEGORIES.SLEEP]: "transparent",
 } as const;
+
+// Individual sound icon colors - all transparent backgrounds
+export const SOUND_ICON_COLORS = {
+  "White Noise": "transparent",
+  Rain: "transparent",
+  Ocean: "transparent",
+  "Air Conditioning": "transparent",
+  Fan: "transparent",
+  Fridge: "transparent",
+  "Brown Noise": "transparent",
+  "Pink Noise": "transparent",
+  Crickets: "transparent",
+  Birds: "transparent",
+  Waves: "transparent",
+  Storm: "transparent",
+  Thunder: "transparent",
+  Wind: "transparent",
+  Leaves: "transparent",
+  Forest: "transparent",
+  "Babbling Brook": "transparent",
+  Waterfall: "transparent",
+  Spring: "transparent",
+  River: "transparent",
+  Fireplace: "transparent",
+  "Distant Thunder": "transparent",
+  "Busy Cafe": "transparent",
+  Traffic: "transparent",
+  "City Ambience": "transparent",
+  Train: "transparent",
+  "Airplane Cabin": "transparent",
+  "Space Station": "transparent",
+  Spaceship: "transparent",
+  "Meditation Bell": "transparent",
+  "Singing Bowls": "transparent",
+  "Tibetan Bowls": "transparent",
+  Chime: "transparent",
+  "Water Fountain": "transparent",
+  Bell: "transparent",
+  Clock: "transparent",
+  "Ticking Clock": "transparent",
+  Heartbeat: "transparent",
+  "Binaural Beats": "transparent",
+  "Meditation Ambient": "transparent",
+  "Sleep Ambient": "transparent",
+  "Peaceful Place": "transparent",
+  "Yoga Ambient": "transparent",
+  "Spa Sounds": "transparent",
+  "Whale Sounds": "transparent",
+  "Dolphin Sounds": "transparent",
+  Seagulls: "transparent",
+  Beach: "transparent",
+  Desert: "transparent",
+  Mountain: "transparent",
+  Thunderstorm: "transparent",
+  "Heavy Rain": "transparent",
+} as const;
+
+// Helper function to get actual color from theme
+export const getColorFromTheme = (
+  colorName: string | undefined,
+  theme: any,
+  themeMode: "light" | "dark" = "dark",
+) => {
+  if (colorName === "transparent") return "transparent";
+  if (!colorName) return themeMode === "light" ? "#2c2622" : "#ffffff";
+
+  const colorMap: { [key: string]: keyof typeof theme } = {
+    rain: "rain",
+    ocean: "ocean",
+    forest: "forest",
+    fire: "fire",
+    night: "night",
+    urban: "urban",
+  };
+
+  const themeColorKey = colorMap[colorName];
+  return themeColorKey ? theme[themeColorKey] || "#888888" : "#888888";
+};
 
 export type SoundCategory =
   (typeof SOUND_CATEGORIES)[keyof typeof SOUND_CATEGORIES];

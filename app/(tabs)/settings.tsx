@@ -11,7 +11,6 @@ import { Analytics } from "@/utils/analytics";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -154,7 +153,7 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       Analytics.trackSettingsOpened();
-    }, [])
+    }, []),
   );
 
   // Reload favorites count when screen comes into focus
@@ -179,7 +178,7 @@ export default function SettingsScreen() {
           setFavoritesCount(0);
         }
       })();
-    }, [])
+    }, []),
   );
 
   const triggerHaptic = (type: "light" | "medium" | "heavy" = "light") => {
@@ -221,7 +220,11 @@ export default function SettingsScreen() {
       activeOpacity={0.7}
     >
       <View style={[styles.settingIcon, { backgroundColor: color }]}>
-        <Ionicons name={icon} size={20} color="white" />
+        <Ionicons
+          name={icon}
+          size={20}
+          color={color === theme.primary ? "white" : theme.text}
+        />
       </View>
       <View style={styles.settingContent}>
         <Text
@@ -367,7 +370,17 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleSelectFavorite = async (id: number) => {
+  const handleSelectFavorite = async (id: number | null) => {
+    // Handle "None" selection to clear quick play
+    if (id === null) {
+      triggerHaptic("medium");
+      await Storage.setItem("favorite_sound_id", "");
+      setFavoriteSoundId(null);
+      setModalVisible(false);
+      Analytics.trackQuickPlayStopped();
+      return;
+    }
+
     const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === id);
     if (!sound) return;
 
@@ -378,8 +391,12 @@ export default function SettingsScreen() {
       return;
     }
 
+    // Immediately set and close
+    triggerHaptic("medium");
+    await Storage.setItem("favorite_sound_id", String(id));
+    setFavoriteSoundId(String(id));
     setModalVisible(false);
-    setSelectedSoundForConfirm({ id, name: sound.name });
+    Analytics.trackQuickPlaySet(id, sound.name);
   };
 
   const confirmQuickPlaySelection = async () => {
@@ -388,22 +405,17 @@ export default function SettingsScreen() {
 
     await Storage.setItem(
       "favorite_sound_id",
-      String(selectedSoundForConfirm.id)
+      String(selectedSoundForConfirm.id),
     );
     setFavoriteSoundId(String(selectedSoundForConfirm.id));
 
     // Track quick play sound set
     Analytics.trackQuickPlaySet(
       selectedSoundForConfirm.id,
-      selectedSoundForConfirm.name
+      selectedSoundForConfirm.name,
     );
 
-    setSelectedSoundForConfirm(null); // Show success message
-    setSuccessMessage(
-      `${selectedSoundForConfirm.name} is now your quick play sound.`
-    );
-    setSuccessMessageVisible(true);
-    setTimeout(() => setSuccessMessageVisible(false), 2500);
+    setSelectedSoundForConfirm(null);
   };
 
   const confirmClearQuickPlay = async () => {
@@ -414,11 +426,6 @@ export default function SettingsScreen() {
 
     // Track quick play cleared
     Analytics.trackQuickPlayStopped();
-
-    // Show success message
-    setSuccessMessage("Quick play sound has been cleared.");
-    setSuccessMessageVisible(true);
-    setTimeout(() => setSuccessMessageVisible(false), 2500);
   };
 
   const handleClearFavorites = () => {
@@ -440,10 +447,6 @@ export default function SettingsScreen() {
     await Storage.setItem(FAVORITES_KEY, JSON.stringify([]));
     setFavoritesCount(0);
     setConfirmClearFavoritesVisible(false);
-
-    setSuccessMessage("All favorites have been cleared.");
-    setSuccessMessageVisible(true);
-    setTimeout(() => setSuccessMessageVisible(false), 2500);
   };
 
   const renderSoundItem = ({ item }: any) => {
@@ -474,7 +477,7 @@ export default function SettingsScreen() {
         {item.premium && !pro && (
           <View
             style={{
-              backgroundColor: "#8b5cf6",
+              backgroundColor: themeMode === "light" ? "#9b8fa8" : "#8b5cf6",
               paddingHorizontal: 10,
               paddingVertical: 4,
               borderRadius: 6,
@@ -506,13 +509,6 @@ export default function SettingsScreen() {
         backgroundColor={theme.background}
       />
 
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Settings</Text>
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Customize your experience
-        </Text>
-      </View>
-
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -521,7 +517,7 @@ export default function SettingsScreen() {
           setScrollViewRef("settings", ref);
         }}
       >
-        <SectionHeader title="Audio Settings" />
+        <SectionHeader title="App Settings" />
         <SettingItem
           icon="volume-high"
           title="Background Playback"
@@ -536,19 +532,30 @@ export default function SettingsScreen() {
           color={backgroundPlayEnabled ? theme.success : theme.surface}
         />
 
-        <SectionHeader title="App Settings" />
         <SettingItem
           icon={themeMode === "dark" ? "sunny" : "moon"}
           title="Dark Mode"
-          description={`Currently using ${themeMode} theme`}
+          description={
+            highContrastMode
+              ? "Disabled: High Contrast mode is active"
+              : `Currently using ${themeMode} theme`
+          }
           hasSwitch={true}
           switchValue={themeMode === "dark"}
           onSwitchChange={() => {
+            if (highContrastMode) {
+              Alert.alert(
+                "High Contrast Mode Active",
+                "Theme switching is disabled while High Contrast mode is enabled. Please disable High Contrast mode first if you want to change the theme.",
+                [{ text: "OK" }],
+              );
+              return;
+            }
             const newMode = themeMode === "dark" ? "light" : "dark";
             Analytics.trackThemeChanged(newMode);
             toggleTheme();
           }}
-          color={theme.primary}
+          color={highContrastMode ? theme.textSecondary : theme.primary}
         />
 
         <SettingItem
@@ -558,7 +565,7 @@ export default function SettingsScreen() {
             favoriteSoundId
               ? `Current: ${
                   WHITE_NOISE_SOUNDS.find(
-                    (s) => String(s.id) === favoriteSoundId
+                    (s) => String(s.id) === favoriteSoundId,
                   )?.name
                 }`
               : "No quick play sound selected"
@@ -566,21 +573,6 @@ export default function SettingsScreen() {
           onPress={() => setModalVisible(true)}
           showArrow={true}
           color={theme.forest}
-        />
-
-        <SettingItem
-          icon="trash"
-          title="Clear Favorites"
-          description={
-            favoritesCount > 0
-              ? `${favoritesCount} favorite sound${
-                  favoritesCount === 1 ? "" : "s"
-                }`
-              : "No favorites to clear"
-          }
-          onPress={handleClearFavorites}
-          showArrow={true}
-          color={theme.error}
         />
 
         <SectionHeader title="Accessibility" />
@@ -705,7 +697,7 @@ export default function SettingsScreen() {
             style={{
               flexDirection: "row",
               alignItems: "center",
-              backgroundColor: "#8b5cf6",
+              backgroundColor: themeMode === "light" ? "#9b8fa8" : "#8b5cf6",
               padding: 16,
               borderRadius: 12,
               marginTop: 16,
@@ -719,6 +711,8 @@ export default function SettingsScreen() {
                 fontSize: 16,
                 fontWeight: "600",
                 marginLeft: 12,
+                paddingRight: 12,
+                flex: 1,
               }}
             >
               Upgrade to Pro - Unlock 44 Premium Sounds
@@ -850,12 +844,42 @@ export default function SettingsScreen() {
         )}
 
         <View style={styles.footer}>
-          <Image
-            style={styles.footerLogo}
-            source={themeMode === "dark" ? darkLogo : whiteLogo}
-            contentFit="contain"
-            transition={1000}
-          />
+          <View style={{ marginBottom: 24 }}>
+            <TouchableOpacity
+              onPress={handleClearFavorites}
+              disabled={favoritesCount === 0}
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                marginHorizontal: 16,
+                backgroundColor:
+                  favoritesCount === 0
+                    ? theme.textSecondary + "40"
+                    : theme.error,
+                borderRadius: 12,
+                alignItems: "center",
+                opacity: favoritesCount === 0 ? 0.5 : 1,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Ionicons
+                  name="trash"
+                  size={18}
+                  color="white"
+                  style={{ marginRight: 8 }}
+                />
+                <Text
+                  style={{
+                    color: "white",
+                    fontSize: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  Clear Favorites
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
@@ -1003,58 +1027,98 @@ export default function SettingsScreen() {
         <SafeAreaView
           style={[styles.container, { backgroundColor: theme.background }]}
         >
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.border,
+            }}
+          >
+            <Text
+              style={[
+                styles.title,
+                { color: theme.text, marginBottom: 0, flex: 1 },
+              ]}
+            >
               Select Quick Play Sound
             </Text>
-          </View>
-          {favoriteSoundId && (
             <TouchableOpacity
-              style={{
-                marginHorizontal: 16,
-                marginBottom: 8,
-                padding: 12,
-                backgroundColor: theme.error,
-                borderRadius: 12,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onPress={() => {
-                setModalVisible(false);
-                setConfirmClearQuickPlayVisible(true);
-              }}
+              onPress={() => setModalVisible(false)}
+              style={{ padding: 8 }}
             >
-              <Ionicons name="trash" size={20} color="white" />
-              <Text
-                style={{
-                  color: "white",
-                  marginLeft: 8,
-                  fontWeight: "600",
-                }}
-              >
-                Clear Quick Play
-              </Text>
+              <Ionicons name="close" size={24} color={theme.text} />
             </TouchableOpacity>
-          )}
+          </View>
+
           <FlatList
-            data={WHITE_NOISE_SOUNDS}
+            data={[
+              {
+                id: -1,
+                name: "None",
+                description: "No quick play sound",
+                icon: "close-circle",
+                color: theme.textSecondary,
+                premium: false,
+                isLocal: false,
+              },
+              ...WHITE_NOISE_SOUNDS,
+            ]}
             keyExtractor={(item) => item.id.toString()}
-            renderItem={renderSoundItem}
+            renderItem={({ item }) => {
+              if (item.id === -1) {
+                // Custom render for "None" option
+                const isSelected = !favoriteSoundId;
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.soundItem,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                      isSelected && { borderColor: theme.primary },
+                    ]}
+                    onPress={() => handleSelectFavorite(null)}
+                  >
+                    <View
+                      style={[
+                        styles.soundIcon,
+                        { backgroundColor: theme.error },
+                      ]}
+                    >
+                      <Ionicons name="close" size={20} color="#fff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.soundTitle, { color: theme.text }]}>
+                        {item.name}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.soundDesc,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {item.description}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color={theme.primary}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              }
+              return renderSoundItem({ item });
+            }}
             contentContainerStyle={{ padding: 16 }}
           />
-          <TouchableOpacity
-            style={{
-              margin: 16,
-              padding: 16,
-              backgroundColor: theme.error,
-              borderRadius: 12,
-              alignItems: "center",
-            }}
-            onPress={() => setModalVisible(false)}
-          >
-            <Text style={{ color: "white", fontWeight: "600" }}>Cancel</Text>
-          </TouchableOpacity>
         </SafeAreaView>
       </Modal>
 

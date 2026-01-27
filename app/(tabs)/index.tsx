@@ -1,7 +1,6 @@
 import { PaywallModal } from "@/components/PaywallModal";
 import { SoundCardSkeleton } from "@/components/ShimmerLoader";
 import {
-  CATEGORY_COLORS,
   SOUND_CATEGORIES,
   SoundCategory,
   WHITE_NOISE_SOUNDS,
@@ -88,6 +87,7 @@ function MixerModal({
   visible,
   onClose,
   theme,
+  themeMode,
   activeSounds,
   onToggleSound,
   onVolumeChange,
@@ -99,6 +99,7 @@ function MixerModal({
   visible: boolean;
   onClose: () => void;
   theme: any;
+  themeMode: "light" | "dark";
   activeSounds: Map<
     number,
     { sound: any; soundItem: any; volume: number; isMuted: boolean }
@@ -258,7 +259,8 @@ function MixerModal({
                     {isLocked ? (
                       <View
                         style={{
-                          backgroundColor: "#8b5cf6",
+                          backgroundColor:
+                            themeMode === "light" ? "#9b8fa8" : "#8b5cf6",
                           paddingHorizontal: 10,
                           paddingVertical: 4,
                           borderRadius: 6,
@@ -778,9 +780,6 @@ export default function SoundsScreen() {
   // RevenueCat - check if user has Pro access
   const { isPro: pro } = useRevenueCat();
 
-  // Pro Banner dismiss state
-  const [proBannerDismissed, setProBannerDismissed] = useState(false);
-
   // Volume warning state
   const [showVolumeWarning, setShowVolumeWarning] = useState(false);
   const [volumeWarningDismissed, setVolumeWarningDismissed] = useState(false);
@@ -814,23 +813,6 @@ export default function SoundsScreen() {
 
   const playerSlide = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
-
-  const handleClosePlayer = () => {
-    Animated.parallel([
-      Animated.timing(playerSlide, {
-        toValue: 300,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(overlayOpacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      stopAllSounds();
-    });
-  };
 
   const configureAudioSession = useCallback(async () => {
     try {
@@ -1105,7 +1087,6 @@ export default function SoundsScreen() {
 
     if (newFavorites.has(soundId)) {
       newFavorites.delete(soundId);
-      showSnackbar("Removed from favorites");
       safeAnalytics.trackFavoriteRemoved(soundId, sound?.name || "Unknown");
 
       if (selectedCategory === "Favourites" && newFavorites.size === 0) {
@@ -1113,7 +1094,6 @@ export default function SoundsScreen() {
       }
     } else {
       newFavorites.add(soundId);
-      showSnackbar("Added to favorites");
       safeAnalytics.trackFavoriteAdded(
         soundId,
         sound?.name || "Unknown",
@@ -1949,7 +1929,7 @@ export default function SoundsScreen() {
       Alert.alert("Error", "Could not stop sounds.");
       console.error("Error stopping sounds:", error);
     }
-  }, [activeSounds, hidePlayingNotification]);
+  }, [activeSounds]);
 
   // Register stopAllSounds callback with context - use ref to avoid re-renders
   const stopAllSoundsRef = useRef(stopAllSounds);
@@ -2091,16 +2071,23 @@ export default function SoundsScreen() {
         e.stopPropagation();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+        // Quick bounce animation
         Animated.sequence([
-          Animated.spring(heartScale, {
-            toValue: 1.3,
-            friction: 3,
-            tension: 40,
+          Animated.timing(heartScale, {
+            toValue: 1.4,
+            duration: 150,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(heartScale, {
+            toValue: 0.95,
+            duration: 150,
+            easing: Easing.in(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.spring(heartScale, {
             toValue: 1,
-            friction: 3,
+            friction: 4,
             tension: 40,
             useNativeDriver: true,
           }),
@@ -2164,7 +2151,11 @@ export default function SoundsScreen() {
                   </View>
                 </View>
               ) : (
-                <Ionicons name={soundItem.icon} size={24} color="white" />
+                <Ionicons
+                  name={soundItem.icon}
+                  size={24}
+                  color={themeMode === "light" ? "#2c2622" : "white"}
+                />
               )}
             </Animated.View>
 
@@ -2180,27 +2171,6 @@ export default function SoundsScreen() {
                 >
                   {soundItem.name}
                 </Text>
-                {favoriteSoundId === String(soundItem.id) && (
-                  <View
-                    style={{
-                      backgroundColor: "#ff6b6b",
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 4,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 9,
-                        fontWeight: "700",
-                        letterSpacing: 0.3,
-                      }}
-                    >
-                      QUICK PLAY
-                    </Text>
-                  </View>
-                )}
               </View>
               <Text
                 style={[
@@ -2249,7 +2219,8 @@ export default function SoundsScreen() {
               {soundItem.premium && !pro ? (
                 <View
                   style={{
-                    backgroundColor: "#8b5cf6",
+                    backgroundColor:
+                      themeMode === "light" ? "#9b8fa8" : "#8b5cf6",
                     paddingHorizontal: 10,
                     paddingVertical: 4,
                     borderRadius: 6,
@@ -2325,39 +2296,44 @@ export default function SoundsScreen() {
         backgroundColor={theme.background}
       />
 
-      {/* Pro Upgrade Banner - only show if not pro and not dismissed */}
-      {!pro && !proBannerDismissed && (
-        <TouchableOpacity
-          style={[
-            styles.proBanner,
-            {
-              backgroundColor: "#8b5cf6",
-            },
-          ]}
-          activeOpacity={0.8}
-          onPress={() => setPaywallOpen(true)}
+      {/* Pro Upgrade Banner */}
+      {!pro && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: themeMode === "light" ? "#9b8fa8" : "#8b5cf6",
+            padding: 16,
+            borderRadius: 12,
+            marginTop: 12,
+            marginHorizontal: 16,
+          }}
         >
-          <View style={styles.proBannerContent}>
-            <View style={styles.proBannerIcon}>
-              <Ionicons name="star" size={18} color="#FFD700" />
-            </View>
-            <View style={styles.proBannerText}>
-              <Text style={styles.proBannerTitle}>Upgrade to Pro</Text>
-              <Text style={styles.proBannerSubtitle}>
-                Unlock 44 premium sounds
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                setProBannerDismissed(true);
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+              setPaywallOpen(true);
+            }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              flex: 1,
+            }}
+          >
+            <Ionicons name="star" size={20} color="#fff" />
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: 16,
+                fontWeight: "600",
+                marginLeft: 12,
+                flex: 1,
               }}
-              style={{ padding: 4 }}
             >
-              <Ionicons name="close" size={18} color="white" />
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
+              Upgrade to Pro - Unlock 44 Premium Sounds
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Pro Badge - shown when user has pro subscription */}
@@ -2423,7 +2399,10 @@ export default function SoundsScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={[styles.categoryTabs, { paddingTop: pro ? 4 : 6 }]}
+        style={[
+          styles.categoryTabs,
+          { paddingTop: 12, paddingBottom: 8, marginTop: 16 },
+        ]}
         contentContainerStyle={{
           paddingHorizontal: 16,
           gap: 8,
@@ -2462,19 +2441,6 @@ export default function SoundsScreen() {
             >
               Favourites
             </Text>
-            {selectedCategory === "Favourites" && (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: -2,
-                  left: 8,
-                  right: 8,
-                  height: 3,
-                  backgroundColor: "white",
-                  borderRadius: 2,
-                }}
-              />
-            )}
           </TouchableOpacity>
         )}
 
@@ -2511,19 +2477,6 @@ export default function SoundsScreen() {
             >
               Offline
             </Text>
-            {selectedCategory === "Downloaded" && (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: -2,
-                  left: 8,
-                  right: 8,
-                  height: 3,
-                  backgroundColor: "white",
-                  borderRadius: 2,
-                }}
-              />
-            )}
           </TouchableOpacity>
         )}
         {Object.values(SOUND_CATEGORIES).map((category) => (
@@ -2533,9 +2486,7 @@ export default function SoundsScreen() {
               styles.categoryTab,
               {
                 backgroundColor:
-                  selectedCategory === category
-                    ? CATEGORY_COLORS[category]
-                    : theme.surface,
+                  selectedCategory === category ? theme.primary : theme.surface,
                 borderColor: theme.border,
               },
             ]}
@@ -2563,19 +2514,6 @@ export default function SoundsScreen() {
             >
               {category}
             </Text>
-            {selectedCategory === category && (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: -2,
-                  left: 8,
-                  right: 8,
-                  height: 3,
-                  backgroundColor: "white",
-                  borderRadius: 2,
-                }}
-              />
-            )}
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -2889,6 +2827,7 @@ export default function SoundsScreen() {
           setMixerModalVisible(false);
         }}
         theme={theme}
+        themeMode={themeMode}
         activeSounds={activeSounds}
         onToggleSound={toggleSoundInMixer}
         onVolumeChange={changeSoundVolume}
@@ -2917,27 +2856,26 @@ export default function SoundsScreen() {
             top: 120,
             left: 20,
             right: 20,
-            backgroundColor: theme.surface,
-            padding: 14,
+            backgroundColor: theme.primary,
+            padding: 16,
             borderRadius: 12,
             opacity: snackbar.opacity,
-            borderLeftWidth: 4,
-            borderLeftColor: theme.primary,
             shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.15,
-            shadowRadius: 6,
-            elevation: 6,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+            elevation: 8,
             zIndex: 9999 - index,
             transform: [{ translateY: snackbar.translateY }],
           }}
         >
           <Text
             style={{
-              color: theme.text,
-              fontSize: 14,
-              fontWeight: "600",
+              color: "#ffffff",
+              fontSize: 15,
+              fontWeight: "700",
               textAlign: "center",
+              letterSpacing: 0.3,
             }}
           >
             {snackbar.message}
@@ -3108,16 +3046,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryTabs: {
-    paddingBottom: 6,
-    maxHeight: 50,
+    paddingBottom: 12,
+    maxHeight: 60,
   },
   image: {
     width: 300,
     height: 75,
   },
   categoryTab: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
   },

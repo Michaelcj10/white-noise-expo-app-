@@ -35,13 +35,13 @@ export const CustomSplash: React.FC = () => {
     <LinearGradient
       colors={
         isDark
-          ? ["#0A0903", "#1a1a1a", "#2d2d2d"]
-          : ["#ffffff", "#f5f5f5", "#e0e0e0"]
+          ? ["#0a0a0a", "#1a1a2e", "#16213e", "#0f3460"]
+          : ["#f8f9ff", "#f0f4ff", "#e8f0ff", "#e0ecff"]
       }
       style={styles.container}
-      locations={[0, 0.3, 1]}
+      locations={[0, 0.3, 0.65, 1]}
       start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+      end={{ x: 0.5, y: 1 }}
     >
       <Animated.View
         style={[

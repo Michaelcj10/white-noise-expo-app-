@@ -34,13 +34,13 @@ export const themes = {
     warning: "#f59e0b",
     error: "#ef4444",
 
-    // Sound category colors - vibrant tones
-    rain: "#3b82f6",
-    ocean: "#06b6d4",
-    forest: "#22c55e",
-    fire: "#f97316",
-    night: "#8b5cf6",
-    urban: "#6b7280",
+    // Sound category colors - muted, desaturated
+    rain: "#5b8dd4",
+    ocean: "#4fa3a8",
+    forest: "#5aaa5a",
+    fire: "#d48f4f",
+    night: "#8b5fa3",
+    urban: "#888888",
 
     // Controls
     switchTrackOff: "#2a2a3a",
@@ -48,45 +48,56 @@ export const themes = {
   },
 
   light: {
-    // Core backgrounds - clean whites
-    background: "#fff",
-    surface: "#fff",
-    card: "#ffffff",
+    // Core backgrounds - warm cream tones
+    background: "#FAF9F6", // slightly lighter, warmer
+    surface: "#FFFFFF", // cards pop slightly
+    card: "#FFFFFF",
 
-    // Borders and dividers
-    border: "#e2e8f0",
-    tabBarBorder: "#e2e8f0",
+    // Borders - subtle warmth
+    border: "#E8E4DF",
+    tabBarBorder: "#EBE7E2",
 
-    // Typography hierarchy
-    text: "#0d0d0d",
-    textSecondary: "#737373",
-    textMuted: "#737373",
-    sectionHeader: "#0d0d0d",
+    // Typography - warm charcoal, not harsh black
+    text: "#3D3833",
+    textSecondary: "#7A756E",
+    textMuted: "#A9A49D",
+    sectionHeader: "#5C564F",
 
-    // Interface elements
-    tabBar: "#ffffff",
+    // Interface
+    tabBar: "#FFFFFF",
+    tabBarInactive: "#A9A49D",
+    tabBarActive: "#5B8A72",
 
-    // Accent colors - electric mint theme
-    primary: "#009966",
-    secondary: "#ec4899",
-    accent: "#06b6d4",
+    // Accent - muted sage green (calming, on-brand)
+    primary: "#5B8A72",
+    primaryMuted: "#7BA393",
+    secondary: "#B8A398", // warm taupe
+    accent: "#7BA3A0", // soft teal
 
-    // Status colors
-    success: "#10b981",
-    warning: "#f59e0b",
-    error: "#ef4444",
+    // Status - desaturated
+    success: "#7BA383",
+    warning: "#C9A86C",
+    error: "#C48B8B",
 
-    // Sound category colors - vibrant tones
-    rain: "#3b82f6",
-    ocean: "#06b6d4",
-    forest: "#22c55e",
-    fire: "#f97316",
-    night: "#8b5cf6",
-    urban: "#6b7280",
+    // Sound categories - soft, muted pastels
+    rain: "#8E9BAA", // slate blue
+    ocean: "#89A3A7", // dusty teal
+    forest: "#8B9E87", // sage
+    fire: "#B8A089", // warm sand
+    night: "#9B93A8", // lavender grey
+    urban: "#94908B", // warm grey
 
     // Controls
-    switchTrackOff: "#e2e8f0",
-    switchThumbOff: "#737373",
+    switchTrackOff: "#E5E1DC",
+    switchTrackOn: "#5B8A72",
+    switchThumbOff: "#FFFFFF",
+    switchThumbOn: "#FFFFFF",
+
+    // Cards - subtle depth
+    cardShadow: "rgba(60, 55, 50, 0.06)",
+
+    // Pro banner - subtle gradient suggestion
+    proBannerBg: "#6B5B7A", // muted purple
   },
 };
 
