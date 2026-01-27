@@ -17,15 +17,15 @@ export const themes = {
 
     // Typography hierarchy
     text: "#ffffff",
-    textSecondary: "#737373",
-    textMuted: "#737373",
+    textSecondary: "#c4c0c0",
+    textMuted: "#d6d6d6",
     sectionHeader: "#ffffff",
 
-    // Interface elements
+    // Interface elementsre
     tabBar: "#0d0d0d",
 
     // Accent colors - electric mint theme
-    primary: "#59ac81ff",
+    primary: "#009966",
     secondary: "#ec4899",
     accent: "#06b6d4",
 
@@ -67,7 +67,7 @@ export const themes = {
     tabBar: "#ffffff",
 
     // Accent colors - electric mint theme
-    primary: "#000",
+    primary: "#009966",
     secondary: "#ec4899",
     accent: "#06b6d4",
 

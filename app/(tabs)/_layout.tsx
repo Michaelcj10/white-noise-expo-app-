@@ -59,19 +59,53 @@ export default function TabLayout() {
   const [quickPlaySound, setQuickPlaySound] = useState<any>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showNoQuickPlayModal, setShowNoQuickPlayModal] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+
+  // Onboarding screens data
+  const onboardingScreens = [
+    {
+      title: "Curated Sounds",
+      subtitle: "50+ white noise, nature, and ambient sounds",
+      description: "Hand-picked audio to help you relax, sleep, or concentrate",
+      icon: "musical-notes" as const,
+      iconColor: "#3b82f6",
+      feature: "Browse our full library from the Sounds tab",
+    },
+    {
+      title: "Quick Play",
+      subtitle: "One-tap access to your favorite",
+      description: "Save any sound as your favorite and play it instantly",
+      icon: "heart" as const,
+      iconColor: "#ec4899",
+      feature: "Tap the center button to start playing",
+    },
+    {
+      title: "Mix & Match",
+      subtitle: "Layer multiple sounds together",
+      description:
+        "Combine sounds with individual volume controls for your perfect soundscape",
+      icon: "layers" as const,
+      iconColor: "#06b6d4",
+      feature: "Use the mixer to create your blend",
+    },
+  ];
+
+  const currentScreen = onboardingScreens[onboardingStep];
 
   // Load favorite sound on mount
   useEffect(() => {
-    loadFavoriteSound();
-    checkOnboarding();
-  }, []);
+    const initializeApp = async () => {
+      const storedId = await Storage.getItem("favorite_sound_id");
+      setFavoriteSoundId(storedId);
 
-  const checkOnboarding = async () => {
-    const hasSeenOnboarding = await Storage.getItem("has_seen_onboarding");
-    if (!hasSeenOnboarding) {
-      setShowOnboarding(true);
-    }
-  };
+      const hasSeenOnboarding = await Storage.getItem("has_seen_onboarding");
+      if (!hasSeenOnboarding) {
+        setShowOnboarding(true);
+      }
+    };
+    initializeApp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const completeOnboarding = async () => {
     await Storage.setItem("has_seen_onboarding", "true");
@@ -87,10 +121,11 @@ export default function TabLayout() {
   useEffect(() => {
     const interval = setInterval(loadFavoriteSound, 1000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePanicPress = async (
-    e?: { preventDefault?: () => void } | any
+    e?: { preventDefault?: () => void } | any,
   ) => {
     if (e && typeof (e as any).preventDefault === "function") {
       (e as any).preventDefault();
@@ -104,7 +139,7 @@ export default function TabLayout() {
     }
 
     const favoriteSound = WHITE_NOISE_SOUNDS.find(
-      (s) => String(s.id) === favoriteSoundId
+      (s) => String(s.id) === favoriteSoundId,
     );
 
     if (!favoriteSound) {
@@ -149,7 +184,7 @@ export default function TabLayout() {
             isLooping: true,
             volume: 0.5,
             shouldPlay: true,
-          }
+          },
         );
 
         newSound.setOnPlaybackStatusUpdate((status) => {
@@ -207,7 +242,7 @@ export default function TabLayout() {
   // Custom panic button component
   const PanicButton = () => {
     const favoriteSound = WHITE_NOISE_SOUNDS.find(
-      (s) => String(s.id) === favoriteSoundId
+      (s) => String(s.id) === favoriteSoundId,
     );
 
     return (
@@ -224,7 +259,7 @@ export default function TabLayout() {
             width: 64,
             height: 64,
             borderRadius: 32,
-            backgroundColor: "#ff6b6b",
+            backgroundColor: theme.primary,
             justifyContent: "center",
             alignItems: "center",
             shadowColor: "#000",
@@ -364,222 +399,270 @@ export default function TabLayout() {
         />
       </Tabs>
 
-      {/* Onboarding Modal */}
+      {/* Onboarding Modal - Multi-step Carousel */}
       <Modal visible={showOnboarding} animationType="slide" transparent={false}>
         <LinearGradient
           colors={
             themeMode === "dark"
-              ? ["#000000", "#1a1a1a", "#2d2d2d"]
-              : ["#ffffff", "#f5f5f5", "#e0e0e0"]
+              ? ["#0a0a0a", "#1a1a2e", "#16213e", "#0f3460"]
+              : ["#f8f9ff", "#f0f4ff", "#e8f0ff", "#e0ecff"]
           }
           style={{ flex: 1 }}
-          locations={[0, 0.3, 1]}
+          locations={[0, 0.3, 0.65, 1]}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={{ x: 0.5, y: 1 }}
         >
+          {/* Subtle background pattern overlay */}
           <View
             style={{
-              flex: 1,
-              padding: 20,
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "100%",
+              opacity: 0.03,
+              pointerEvents: "none",
             }}
           >
-            <ScrollView
-              contentContainerStyle={{
-                paddingTop: 20,
+            <LinearGradient
+              colors={["rgba(59, 130, 246, 0.2)", "rgba(99, 102, 241, 0.2)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ flex: 1 }}
+            />
+          </View>
+
+          <View
+            style={{ flex: 1, paddingHorizontal: 20, paddingTop: insets.top }}
+          >
+            {/* Skip Button */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 20,
+                paddingTop: 8,
               }}
-              showsVerticalScrollIndicator={false}
             >
-              <View style={{ alignItems: "center", marginBottom: 24 }}>
-                <Image
-                  source={themeMode === "dark" ? darkLogo : whiteLogo}
-                  style={{
-                    width: 160,
-                    height: 64,
-                    marginBottom: 16,
-                  }}
-                  contentFit="contain"
-                />
+              <Image
+                source={themeMode === "dark" ? darkLogo : whiteLogo}
+                style={{
+                  width: 120,
+                  height: 48,
+                }}
+                contentFit="contain"
+              />
+              <TouchableOpacity
+                onPress={completeOnboarding}
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
                 <Text
                   style={{
-                    fontSize: 26,
+                    color: "white",
+                    fontSize: 14,
+                    fontWeight: "600",
+                  }}
+                >
+                  Skip
+                </Text>
+                <Ionicons name="arrow-forward" size={16} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Progress Dots */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "center",
+                gap: 8,
+                marginBottom: 30,
+              }}
+            >
+              {onboardingScreens.map((_, index) => (
+                <View
+                  key={index}
+                  style={{
+                    width: onboardingStep === index ? 24 : 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor:
+                      onboardingStep === index
+                        ? currentScreen.iconColor
+                        : theme.border,
+                  }}
+                />
+              ))}
+            </View>
+
+            {/* Screen Content */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              {/* Large Icon */}
+              <View
+                style={{
+                  width: 120,
+                  height: 120,
+                  borderRadius: 60,
+                  backgroundColor: currentScreen.iconColor,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: 40,
+                  shadowColor: currentScreen.iconColor,
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 12,
+                  elevation: 6,
+                }}
+              >
+                <Ionicons name={currentScreen.icon} size={56} color="white" />
+              </View>
+
+              {/* Text Content */}
+              <View style={{ alignItems: "center", marginBottom: 40 }}>
+                <Text
+                  style={{
+                    fontSize: 28,
                     fontWeight: "800",
                     color: theme.text,
-                    marginBottom: 8,
+                    marginBottom: 12,
                     textAlign: "center",
                   }}
                 >
-                  Welcome to Slumbr
+                  {currentScreen.title}
                 </Text>
                 <Text
                   style={{
                     fontSize: 16,
-                    color: theme.textSecondary,
+                    fontWeight: "600",
+                    color: currentScreen.iconColor,
+                    marginBottom: 12,
                     textAlign: "center",
-                    lineHeight: 22,
                   }}
                 >
-                  Your peaceful sanctuary for relaxation and focus
+                  {currentScreen.subtitle}
                 </Text>
-              </View>
-
-              <View style={{ gap: 20 }}>
-                {/* Feature 1 */}
-                <View
-                  style={{ flexDirection: "row", alignItems: "flex-start" }}
+                <Text
+                  style={{
+                    fontSize: 15,
+                    color: theme.textSecondary,
+                    textAlign: "center",
+                    lineHeight: 24,
+                    marginBottom: 20,
+                  }}
                 >
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      backgroundColor: theme.primary + "15",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginRight: 12,
-                    }}
-                  >
-                    <Ionicons
-                      name="musical-notes"
-                      size={22}
-                      color={theme.primary}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 18,
-                        fontWeight: "700",
-                        color: theme.text,
-                        marginBottom: 4,
-                      }}
-                    >
-                      Curated Sounds
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        color: theme.textSecondary,
-                        lineHeight: 20,
-                      }}
-                    >
-                      Choose from a variety of high-quality white noise, nature
-                      sounds, and ambient audio to help you relax, sleep, or
-                      concentrate.
-                    </Text>
-                  </View>
-                </View>
+                  {currentScreen.description}
+                </Text>
 
-                {/* Feature 2 */}
+                {/* Feature hint */}
                 <View
-                  style={{ flexDirection: "row", alignItems: "flex-start" }}
+                  style={{
+                    backgroundColor: currentScreen.iconColor + "15",
+                    borderRadius: 12,
+                    padding: 12,
+                    marginTop: 12,
+                  }}
                 >
-                  <View
+                  <Text
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      backgroundColor: theme.primary + "15",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginRight: 12,
+                      fontSize: 13,
+                      color: theme.text,
+                      fontWeight: "600",
+                      textAlign: "center",
                     }}
                   >
-                    <Ionicons name="heart" size={22} color={theme.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 18,
-                        fontWeight: "700",
-                        color: theme.text,
-                        marginBottom: 4,
-                      }}
-                    >
-                      Favorites & Quick Play
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        color: theme.textSecondary,
-                        lineHeight: 20,
-                      }}
-                    >
-                      Save your favorite sounds and set up quick play for
-                      instant access to your most-loved audio.
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Feature 3 */}
-                <View
-                  style={{ flexDirection: "row", alignItems: "flex-start" }}
-                >
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      backgroundColor: theme.primary + "15",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginRight: 12,
-                    }}
-                  >
-                    <Ionicons name="layers" size={22} color={theme.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 18,
-                        fontWeight: "700",
-                        color: theme.text,
-                        marginBottom: 4,
-                      }}
-                    >
-                      Mix & Match
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        color: theme.textSecondary,
-                        lineHeight: 20,
-                      }}
-                    >
-                      Create your perfect soundscape by mixing multiple sounds
-                      together with independent volume controls.
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Button now appears after all features */}
-                <View style={{ paddingTop: 24, paddingBottom: 16 }}>
-                  <TouchableOpacity
-                    onPress={completeOnboarding}
-                    style={{
-                      backgroundColor: theme.primary,
-                      padding: 14,
-                      borderRadius: 12,
-                      alignItems: "center",
-                      shadowColor: theme.primary,
-                      shadowOffset: { width: 0, height: 3 },
-                      shadowOpacity: 0.3,
-                      shadowRadius: 6,
-                      elevation: 6,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 16,
-                        fontWeight: "700",
-                      }}
-                    >
-                      Get Started
-                    </Text>
-                  </TouchableOpacity>
+                    💡 {currentScreen.feature}
+                  </Text>
                 </View>
               </View>
             </ScrollView>
+
+            {/* Navigation Buttons */}
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 12,
+                marginBottom: 32,
+                paddingBottom: insets.bottom,
+              }}
+            >
+              {onboardingStep > 0 && (
+                <TouchableOpacity
+                  onPress={() => setOnboardingStep(onboardingStep - 1)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    borderRadius: 24,
+                    backgroundColor: "transparent",
+                    borderWidth: 2,
+                    borderColor: "white",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Ionicons name="arrow-back" size={18} color="white" />
+                  <Text
+                    style={{
+                      color: "white",
+                      fontSize: 16,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Back
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => {
+                  if (onboardingStep < onboardingScreens.length - 1) {
+                    setOnboardingStep(onboardingStep + 1);
+                  } else {
+                    completeOnboarding();
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderRadius: 24,
+                  backgroundColor: theme.primary,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "white",
+                    fontSize: 16,
+                    fontWeight: "700",
+                  }}
+                >
+                  {onboardingStep === onboardingScreens.length - 1
+                    ? "Get Started"
+                    : "Next"}
+                </Text>
+                <Ionicons
+                  name={
+                    onboardingStep === onboardingScreens.length - 1
+                      ? "play"
+                      : "arrow-forward"
+                  }
+                  size={18}
+                  color="white"
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </LinearGradient>
       </Modal>

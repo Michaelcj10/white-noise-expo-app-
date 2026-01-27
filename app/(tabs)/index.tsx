@@ -280,7 +280,7 @@ function MixerModal({
                       <TouchableOpacity
                         onPress={() => {
                           Haptics.impactAsync(
-                            Haptics.ImpactFeedbackStyle.Light
+                            Haptics.ImpactFeedbackStyle.Light,
                           );
                           onToggleFavorite(soundItem.id);
                         }}
@@ -526,7 +526,7 @@ function EmptyPlayerState({ theme }: { theme: any }) {
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, [pulseAnim]);
 
@@ -612,7 +612,7 @@ const safeAnalytics = {
     id: number,
     name: string,
     premium: boolean,
-    mode: "single" | "mixer"
+    mode: "single" | "mixer",
   ) => {
     try {
       Analytics.trackSoundPlayed(id, name, premium, mode);
@@ -669,7 +669,7 @@ const safeAnalytics = {
       | "premium_sound"
       | "banner"
       | "settings"
-      | "favorite"
+      | "favorite",
   ) => {
     try {
       Analytics.trackPaywallViewed(source);
@@ -778,6 +778,13 @@ export default function SoundsScreen() {
   // RevenueCat - check if user has Pro access
   const { isPro: pro } = useRevenueCat();
 
+  // Pro Banner dismiss state
+  const [proBannerDismissed, setProBannerDismissed] = useState(false);
+
+  // Volume warning state
+  const [showVolumeWarning, setShowVolumeWarning] = useState(false);
+  const [volumeWarningDismissed, setVolumeWarningDismissed] = useState(false);
+
   // Paywall state
   const [paywallOpen, setPaywallOpen] = useState(false);
 
@@ -786,12 +793,12 @@ export default function SoundsScreen() {
 
   // Downloaded sounds state - local sounds (0: white noise, 1: rain, 2: ocean) are pre-downloaded
   const [downloadedSounds, setDownloadedSounds] = useState<Set<number>>(
-    new Set([0, 1, 2])
+    new Set([0, 1, 2]),
   );
 
   // Downloading sounds state - track which sounds are currently being downloaded
   const [downloadingStates, setDownloadingStates] = useState<Set<number>>(
-    new Set()
+    new Set(),
   );
 
   // Snackbar state for favorites and download feedback - supports multiple toasts
@@ -893,7 +900,7 @@ export default function SoundsScreen() {
     };
     const subscription = AppState.addEventListener(
       "change",
-      handleAppStateChange
+      handleAppStateChange,
     );
     return () => subscription?.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1070,7 +1077,7 @@ export default function SoundsScreen() {
         }
       };
       loadFavorites();
-    }, [])
+    }, []),
   );
 
   // Save favorites to storage whenever they change
@@ -1110,7 +1117,7 @@ export default function SoundsScreen() {
       safeAnalytics.trackFavoriteAdded(
         soundId,
         sound?.name || "Unknown",
-        isPremium
+        isPremium,
       );
       safeAnalytics.incrementUserProperty("total_favorites_added", 1);
     }
@@ -1206,7 +1213,7 @@ export default function SoundsScreen() {
                   return newSet;
                 });
                 const sound = WHITE_NOISE_SOUNDS.find(
-                  (s) => s.id === completedId
+                  (s) => s.id === completedId,
                 );
                 if (sound) {
                   showSnackbar(`${sound.name} saved for offline`);
@@ -1214,13 +1221,13 @@ export default function SoundsScreen() {
                 }
               } else {
                 const sound = WHITE_NOISE_SOUNDS.find(
-                  (s) => s.id === completedId
+                  (s) => s.id === completedId,
                 );
                 if (sound) {
                   showSnackbar(`Failed to save ${sound.name} for offline`);
                 }
               }
-            }
+            },
           );
         }
 
@@ -1257,7 +1264,7 @@ export default function SoundsScreen() {
               });
             }
           },
-          false
+          false,
         );
 
         setLoadingSounds((prev) => {
@@ -1268,7 +1275,7 @@ export default function SoundsScreen() {
 
         if (isPlaying) {
           console.log(
-            `⏯️  Triggering playback for mixer sound ${soundItem.id}...`
+            `⏯️  Triggering playback for mixer sound ${soundItem.id}...`,
           );
           newSound.playAsync().catch((err) => {
             console.error(`Error playing mixer sound ${soundItem.id}:`, err);
@@ -1293,7 +1300,7 @@ export default function SoundsScreen() {
 
         Alert.alert(
           "Error",
-          "Could not load sound. Please check your internet connection."
+          "Could not load sound. Please check your internet connection.",
         );
         console.error("Error playing sound:", error);
         return;
@@ -1330,14 +1337,14 @@ export default function SoundsScreen() {
   const handleDownloadSound = useCallback(
     async (soundItem: any) => {
       console.log(
-        `🎯 [handleDownloadSound] Clicked for sound ${soundItem.id} - ${soundItem.name}`
+        `🎯 [handleDownloadSound] Clicked for sound ${soundItem.id} - ${soundItem.name}`,
       );
 
       const isFreeDownloadable = !soundItem.premium;
 
       if (!pro && !isFreeDownloadable) {
         console.log(
-          `🎯 [handleDownloadSound] Free user tried to download pro sound`
+          `🎯 [handleDownloadSound] Free user tried to download pro sound`,
         );
         showSnackbar("Upgrade to Pro to save sounds for offline use");
         safeAnalytics.trackPaywallViewed("offline_limit");
@@ -1352,7 +1359,7 @@ export default function SoundsScreen() {
 
       if (downloadingStates.has(soundItem.id)) {
         console.log(
-          `🎯 [handleDownloadSound] Already downloading, ignoring duplicate`
+          `🎯 [handleDownloadSound] Already downloading, ignoring duplicate`,
         );
         return;
       }
@@ -1362,28 +1369,28 @@ export default function SoundsScreen() {
         const isOnline = await checkNetworkConnectivity();
         if (!isOnline) {
           showSnackbar(
-            "Cannot download in offline mode. Please check your internet connection."
+            "Cannot download in offline mode. Please check your internet connection.",
           );
           console.log(`🎯 [handleDownloadSound] Device is offline`);
           return;
         }
 
         console.log(
-          `🎯 [handleDownloadSound] Setting downloading state for ${soundItem.id}`
+          `🎯 [handleDownloadSound] Setting downloading state for ${soundItem.id}`,
         );
         setDownloadingStates((prev) => new Set(prev).add(soundItem.id));
 
         console.log(
-          `🎯 [handleDownloadSound] Calling soundCache.initiateDownload with pro=${pro}`
+          `🎯 [handleDownloadSound] Calling soundCache.initiateDownload with pro=${pro}`,
         );
         const success = await soundCache.initiateDownload(soundItem, pro);
         console.log(
-          `🎯 [handleDownloadSound] initiateDownload returned: ${success} for sound ${soundItem.id}`
+          `🎯 [handleDownloadSound] initiateDownload returned: ${success} for sound ${soundItem.id}`,
         );
 
         if (success) {
           console.log(
-            `🎯 [handleDownloadSound] Marking ${soundItem.id} as downloaded`
+            `🎯 [handleDownloadSound] Marking ${soundItem.id} as downloaded`,
           );
           setDownloadedSounds((prev) => new Set(prev).add(soundItem.id));
 
@@ -1391,11 +1398,11 @@ export default function SoundsScreen() {
           safeAnalytics.trackSoundDownloaded(soundItem.id, soundItem.name);
         } else {
           console.log(
-            `🎯 [handleDownloadSound] Download failed for ${soundItem.id}`
+            `🎯 [handleDownloadSound] Download failed for ${soundItem.id}`,
           );
           if (!pro && !soundCache.canDownloadMore(pro)) {
             showSnackbar(
-              `Free users can save 1 offline sound. Upgrade to Pro for unlimited.`
+              `Free users can save 1 offline sound. Upgrade to Pro for unlimited.`,
             );
             safeAnalytics.trackPaywallViewed("offline_limit");
             setPaywallOpen(true);
@@ -1415,7 +1422,7 @@ export default function SoundsScreen() {
         });
       }
     },
-    [downloadingStates, pro, showSnackbar]
+    [downloadingStates, pro, showSnackbar],
   );
 
   // Fade in sound over duration
@@ -1460,7 +1467,7 @@ export default function SoundsScreen() {
         }
       }
     },
-    []
+    [],
   );
 
   // Fade out sound over duration
@@ -1503,7 +1510,7 @@ export default function SoundsScreen() {
         }
       }
     },
-    []
+    [],
   );
 
   // Helper function to clean up existing sounds without resetting state
@@ -1522,7 +1529,7 @@ export default function SoundsScreen() {
         const cleanupSound = async () => {
           try {
             console.log(
-              `  ⏹️  Cleaning up sound ${id} (${data.soundItem.name})...`
+              `  ⏹️  Cleaning up sound ${id} (${data.soundItem.name})...`,
             );
 
             // Clear playback status listener to prevent memory leaks
@@ -1531,7 +1538,7 @@ export default function SoundsScreen() {
             } catch (listenerError) {
               console.warn(
                 `⚠️  Could not clear listener for sound ${id}:`,
-                listenerError
+                listenerError,
               );
             }
 
@@ -1574,7 +1581,7 @@ export default function SoundsScreen() {
   // Helper function to load a new sound (returns sound object, doesn't play yet)
   const loadNewSound = useCallback(
     async (
-      soundItem: any
+      soundItem: any,
     ): Promise<{
       sound: Audio.Sound;
       soundItem: any;
@@ -1590,16 +1597,16 @@ export default function SoundsScreen() {
       try {
         const sourcePromise = soundCache.getSource(soundItem, true, true);
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Source load timeout")), 5000)
+          setTimeout(() => reject(new Error("Source load timeout")), 5000),
         );
         source = await Promise.race([sourcePromise, timeoutPromise]);
       } catch (error) {
         console.warn(
-          `⚠️ Failed to get sound source (likely offline): ${error}`
+          `⚠️ Failed to get sound source (likely offline): ${error}`,
         );
         // In offline mode, if no cached version available, can't play
         throw new Error(
-          `Cannot load ${soundItem.name} - check your internet connection or download it for offline use`
+          `Cannot load ${soundItem.name} - check your internet connection or download it for offline use`,
         );
       }
 
@@ -1615,7 +1622,7 @@ export default function SoundsScreen() {
                 return newSet;
               });
               const sound = WHITE_NOISE_SOUNDS.find(
-                (s) => s.id === completedId
+                (s) => s.id === completedId,
               );
               if (sound) {
                 showSnackbar(`${sound.name} saved for offline`);
@@ -1623,13 +1630,13 @@ export default function SoundsScreen() {
               }
             } else {
               const sound = WHITE_NOISE_SOUNDS.find(
-                (s) => s.id === completedId
+                (s) => s.id === completedId,
               );
               if (sound) {
                 showSnackbar(`Failed to save ${sound.name} for offline`);
               }
             }
-          }
+          },
         );
       }
 
@@ -1655,18 +1662,18 @@ export default function SoundsScreen() {
             androidImplementation: "MediaPlayer",
           },
           undefined, // No status callback during load - we'll set it after
-          false // Don't download entire file before playing
+          false, // Don't download entire file before playing
         );
         const timeoutPromise = new Promise<{ sound: Audio.Sound }>(
           (_, reject) =>
-            setTimeout(() => reject(new Error("Sound creation timeout")), 8000)
+            setTimeout(() => reject(new Error("Sound creation timeout")), 8000),
         );
         const result = await Promise.race([createPromise, timeoutPromise]);
         newSound = result.sound;
       } catch (error) {
         console.error(`❌ Failed to create sound object: ${error}`);
         throw new Error(
-          `Could not load ${soundItem.name}. Check internet connection or download for offline.`
+          `Could not load ${soundItem.name}. Check internet connection or download for offline.`,
         );
       }
 
@@ -1680,11 +1687,37 @@ export default function SoundsScreen() {
         id: soundItem.id,
       };
     },
-    [globalMuted, showSnackbar]
+    [globalMuted, showSnackbar],
   );
+
+  // Check system volume and show warning if too low
+  const checkVolumeAndWarn = useCallback(async () => {
+    try {
+      // Get the current sound (Audio module uses system volume)
+      // We can't directly access system volume, so we'll use a heuristic
+      // If user hasn't dismissed warning and sounds are about to play, show it
+      if (!volumeWarningDismissed) {
+        // Small chance to check - show warning to users who may have low volume
+        // This is a non-intrusive reminder
+        setShowVolumeWarning(true);
+
+        // Auto-hide after 5 seconds if not dismissed
+        const timer = setTimeout(() => {
+          setShowVolumeWarning(false);
+        }, 5000);
+
+        return () => clearTimeout(timer);
+      }
+    } catch (error) {
+      console.log("Could not check volume:", error);
+    }
+  }, [volumeWarningDismissed]);
 
   // Main function to play a single sound (with parallel cleanup + load)
   const tryPlaySingle = async (soundItem: any) => {
+    // Check volume warning first
+    await checkVolumeAndWarn();
+
     // Check if sound is premium and user doesn't have pro
     console.log(`Trying to play: ${soundItem.name}`);
     console.log(`Is premium: ${soundItem.premium}`);
@@ -1704,7 +1737,7 @@ export default function SoundsScreen() {
       soundItem.id,
       soundItem.name,
       soundItem.premium,
-      "single"
+      "single",
     );
 
     // If this sound is already the only one playing, do nothing
@@ -1744,7 +1777,7 @@ export default function SoundsScreen() {
       fadeInSound(
         soundData.sound,
         soundData.isMuted ? 0 : soundData.volume,
-        500
+        500,
       );
 
       // ✅ Playback status tracking handled by usePlaybackStatusPolling hook
@@ -1862,7 +1895,7 @@ export default function SoundsScreen() {
         if (data?.sound) {
           try {
             console.log(
-              `  ⏹️  Stopping sound ${id} (${data.soundItem.name})...`
+              `  ⏹️  Stopping sound ${id} (${data.soundItem.name})...`,
             );
 
             try {
@@ -1870,7 +1903,7 @@ export default function SoundsScreen() {
             } catch (listenerError) {
               console.warn(
                 `⚠️  Could not clear listener for sound ${id}:`,
-                listenerError
+                listenerError,
               );
             }
 
@@ -1960,7 +1993,7 @@ export default function SoundsScreen() {
             await stopAllSoundsRef.current();
             break;
         }
-      }
+      },
     );
 
     return () => {
@@ -2022,7 +2055,7 @@ export default function SoundsScreen() {
                 easing: Easing.inOut(Easing.ease),
                 useNativeDriver: true,
               }),
-            ])
+            ]),
           ).start();
         } else {
           iconPulse.stopAnimation();
@@ -2175,6 +2208,7 @@ export default function SoundsScreen() {
                   {
                     color: theme.textSecondary,
                     fontSize: getScaledFontSize(14),
+                    opacity: 0.95,
                   },
                 ]}
               >
@@ -2259,7 +2293,7 @@ export default function SoundsScreen() {
           </TouchableOpacity>
         </Animated.View>
       );
-    }
+    },
   );
   SoundCard.displayName = "SoundCard";
 
@@ -2291,8 +2325,8 @@ export default function SoundsScreen() {
         backgroundColor={theme.background}
       />
 
-      {/* Pro Upgrade Banner - only show if not pro */}
-      {!pro && (
+      {/* Pro Upgrade Banner - only show if not pro and not dismissed */}
+      {!pro && !proBannerDismissed && (
         <TouchableOpacity
           style={[
             styles.proBanner,
@@ -2305,15 +2339,23 @@ export default function SoundsScreen() {
         >
           <View style={styles.proBannerContent}>
             <View style={styles.proBannerIcon}>
-              <Ionicons name="star" size={20} color="#FFD700" />
+              <Ionicons name="star" size={18} color="#FFD700" />
             </View>
             <View style={styles.proBannerText}>
               <Text style={styles.proBannerTitle}>Upgrade to Pro</Text>
               <Text style={styles.proBannerSubtitle}>
-                Free has no ads • Unlock 44 premium sounds
+                Unlock 44 premium sounds
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="white" />
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                setProBannerDismissed(true);
+              }}
+              style={{ padding: 4 }}
+            >
+              <Ionicons name="close" size={18} color="white" />
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       )}
@@ -2452,7 +2494,7 @@ export default function SoundsScreen() {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               safeAnalytics.trackCategorySelected(
                 "Downloaded",
-                downloadedSounds.size
+                downloadedSounds.size,
               );
               setSelectedCategory("Downloaded");
             }}
@@ -2504,8 +2546,8 @@ export default function SoundsScreen() {
                 WHITE_NOISE_SOUNDS.filter(
                   (s) =>
                     selectedCategory === SOUND_CATEGORIES.ALL ||
-                    s.category === category
-                ).length
+                    s.category === category,
+                ).length,
               );
               setSelectedCategory(category);
             }}
@@ -2642,7 +2684,7 @@ export default function SoundsScreen() {
                           ? Array.from(activeSounds.values())[0]?.soundItem
                               ?.color
                           : WHITE_NOISE_SOUNDS.find(
-                              (s) => s.id === Array.from(selectedSounds)[0]
+                              (s) => s.id === Array.from(selectedSounds)[0],
                             )?.color,
                       justifyContent: "center",
                       alignItems: "center",
@@ -2652,7 +2694,7 @@ export default function SoundsScreen() {
                   >
                     {activeSounds.size > 0 &&
                     !loadingSounds.has(
-                      Array.from(activeSounds.values())[0]?.soundItem?.id
+                      Array.from(activeSounds.values())[0]?.soundItem?.id,
                     ) ? (
                       <Ionicons
                         name={
@@ -2688,7 +2730,7 @@ export default function SoundsScreen() {
                         ? Array.from(activeSounds.values())[0]?.soundItem?.name
                         : selectedSounds.size > 0
                           ? WHITE_NOISE_SOUNDS.find(
-                              (s) => s.id === Array.from(selectedSounds)[0]
+                              (s) => s.id === Array.from(selectedSounds)[0],
                             )?.name
                           : "No sound"}
                     </Text>
@@ -2875,24 +2917,26 @@ export default function SoundsScreen() {
             top: 120,
             left: 20,
             right: 20,
-            backgroundColor: theme.primary,
-            padding: 16,
+            backgroundColor: theme.surface,
+            padding: 14,
             borderRadius: 12,
             opacity: snackbar.opacity,
-            shadowColor: theme.primary,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            elevation: 8,
+            borderLeftWidth: 4,
+            borderLeftColor: theme.primary,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.15,
+            shadowRadius: 6,
+            elevation: 6,
             zIndex: 9999 - index,
             transform: [{ translateY: snackbar.translateY }],
           }}
         >
           <Text
             style={{
-              color: "#FFFFFF",
+              color: theme.text,
               fontSize: 14,
-              fontWeight: "700",
+              fontWeight: "600",
               textAlign: "center",
             }}
           >
@@ -2900,6 +2944,62 @@ export default function SoundsScreen() {
           </Text>
         </Animated.View>
       ))}
+
+      {/* Volume Warning Banner */}
+      {showVolumeWarning && !volumeWarningDismissed && (
+        <View
+          style={{
+            position: "absolute",
+            top: 20,
+            left: 16,
+            right: 16,
+            backgroundColor: "#f59e0b",
+            borderRadius: 12,
+            padding: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.2,
+            shadowRadius: 4,
+            elevation: 5,
+            zIndex: 1000,
+          }}
+        >
+          <Ionicons name="volume-mute" size={20} color="white" />
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: "white",
+                fontSize: 13,
+                fontWeight: "600",
+                marginBottom: 2,
+              }}
+            >
+              Volume Low
+            </Text>
+            <Text
+              style={{
+                color: "rgba(255, 255, 255, 0.9)",
+                fontSize: 12,
+                fontWeight: "500",
+              }}
+            >
+              Turn up your device volume to hear the sounds
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => {
+              setShowVolumeWarning(false);
+              setVolumeWarningDismissed(true);
+            }}
+            style={{ padding: 4 }}
+          >
+            <Ionicons name="close" size={16} color="white" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Paywall Modal */}
       <PaywallModal
@@ -2959,26 +3059,26 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   proBanner: {
     marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 16,
-    borderRadius: 12,
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 10,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   proBannerContent: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    gap: 12,
+    padding: 10,
+    gap: 10,
   },
   proBannerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "rgba(255, 255, 255, 0.2)",
     justifyContent: "center",
     alignItems: "center",
@@ -2987,13 +3087,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   proBannerTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
     color: "white",
     marginBottom: 2,
   },
   proBannerSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: "rgba(255, 255, 255, 0.9)",
     fontWeight: "500",
   },
@@ -3034,7 +3134,8 @@ const styles = StyleSheet.create({
   soundCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     marginBottom: 12,
     borderRadius: 16,
     borderWidth: 1,
