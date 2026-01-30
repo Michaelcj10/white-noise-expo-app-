@@ -747,11 +747,16 @@ export default function TabLayout() {
                 }}
                 style={{
                   backgroundColor: theme.primary,
-                  padding: 16,
-                  borderRadius: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderRadius: 24,
                   alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "row",
+                  gap: 6,
                 }}
               >
+                <Ionicons name="settings" size={18} color="white" />
                 <Text
                   style={{
                     color: "white",
@@ -767,11 +772,16 @@ export default function TabLayout() {
                 onPress={() => setShowNoQuickPlayModal(false)}
                 style={{
                   backgroundColor: theme.error,
-                  padding: 16,
-                  borderRadius: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderRadius: 24,
                   alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "row",
+                  gap: 6,
                 }}
               >
+                <Ionicons name="close" size={18} color="white" />
                 <Text
                   style={{
                     color: "white",

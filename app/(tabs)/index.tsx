@@ -1,5 +1,5 @@
 import { PaywallModal } from "@/components/PaywallModal";
-import { SoundCardSkeleton } from "@/components/ShimmerLoader";
+import { ShimmerLoader, SoundCardSkeleton } from "@/components/ShimmerLoader";
 import {
   SOUND_CATEGORIES,
   SoundCategory,
@@ -177,14 +177,15 @@ function MixerModal({
               onClose();
             }}
             style={{
-              padding: 12,
+              paddingVertical: 12,
+              paddingHorizontal: 24,
               alignItems: "center",
               marginBottom: 12,
-              backgroundColor: theme.border,
-              borderRadius: 12,
+              backgroundColor: theme.primary,
+              borderRadius: 24,
             }}
           >
-            <Text style={{ color: theme.text, fontWeight: "600" }}>Done</Text>
+            <Text style={{ color: "white", fontWeight: "600" }}>Done</Text>
           </TouchableOpacity>
 
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -375,10 +376,10 @@ function TimerModal({
     { label: "10 minutes", value: 10 },
     { label: "15 minutes", value: 15 },
     { label: "30 minutes", value: 30 },
-    { label: "45 minutes", value: 45 },
     { label: "1 hour", value: 60 },
-    { label: "90 minutes", value: 90 },
-    { label: "2 hours", value: 120 },
+    { label: "3 hours", value: 180 },
+    { label: "6 hours", value: 360 },
+    { label: "8 hours", value: 480 },
   ];
 
   return (
@@ -412,14 +413,19 @@ function TimerModal({
               handleClose();
             }}
             style={{
-              padding: 12,
+              paddingVertical: 12,
+              paddingHorizontal: 24,
               alignItems: "center",
               marginBottom: 12,
-              backgroundColor: theme.border,
-              borderRadius: 12,
+              backgroundColor: theme.primary,
+              borderRadius: 24,
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: 8,
             }}
           >
-            <Text style={{ color: theme.text, fontWeight: "600" }}>Done</Text>
+            <Ionicons name="checkmark" size={20} color="white" />
+            <Text style={{ color: "white", fontWeight: "600" }}>Done</Text>
           </TouchableOpacity>
 
           <View
@@ -778,11 +784,7 @@ export default function SoundsScreen() {
   const timerIntervalRef = useRef<any>(null);
 
   // RevenueCat - check if user has Pro access
-  const { isPro: pro } = useRevenueCat();
-
-  // Volume warning state
-  const [showVolumeWarning, setShowVolumeWarning] = useState(false);
-  const [volumeWarningDismissed, setVolumeWarningDismissed] = useState(false);
+  const { isPro: pro, isLoading: revenueCatLoading } = useRevenueCat();
 
   // Paywall state
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -1670,34 +1672,8 @@ export default function SoundsScreen() {
     [globalMuted, showSnackbar],
   );
 
-  // Check system volume and show warning if too low
-  const checkVolumeAndWarn = useCallback(async () => {
-    try {
-      // Get the current sound (Audio module uses system volume)
-      // We can't directly access system volume, so we'll use a heuristic
-      // If user hasn't dismissed warning and sounds are about to play, show it
-      if (!volumeWarningDismissed) {
-        // Small chance to check - show warning to users who may have low volume
-        // This is a non-intrusive reminder
-        setShowVolumeWarning(true);
-
-        // Auto-hide after 5 seconds if not dismissed
-        const timer = setTimeout(() => {
-          setShowVolumeWarning(false);
-        }, 5000);
-
-        return () => clearTimeout(timer);
-      }
-    } catch (error) {
-      console.log("Could not check volume:", error);
-    }
-  }, [volumeWarningDismissed]);
-
   // Main function to play a single sound (with parallel cleanup + load)
   const tryPlaySingle = async (soundItem: any) => {
-    // Check volume warning first
-    await checkVolumeAndWarn();
-
     // Check if sound is premium and user doesn't have pro
     console.log(`Trying to play: ${soundItem.name}`);
     console.log(`Is premium: ${soundItem.premium}`);
@@ -1734,6 +1710,10 @@ export default function SoundsScreen() {
     setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
 
     console.log(`🎵 Switching to sound ${soundItem.id} (${soundItem.name})...`);
+
+    // Clear the timer when switching sounds
+    setTimerMinutes(null);
+    setTimerSeconds(0);
 
     try {
       // Run cleanup and loading in parallel for faster switching
@@ -2296,8 +2276,20 @@ export default function SoundsScreen() {
         backgroundColor={theme.background}
       />
 
+      {/* Show skeleton banner while RevenueCat is initializing (only for non-pro users) */}
+      {revenueCatLoading && !pro ? (
+        <View
+          style={{
+            marginTop: 12,
+            marginHorizontal: 16,
+          }}
+        >
+          <ShimmerLoader width="100%" height={60} borderRadius={12} />
+        </View>
+      ) : null}
+
       {/* Pro Upgrade Banner */}
-      {!pro && (
+      {!revenueCatLoading && !pro && (
         <View
           style={{
             flexDirection: "row",
@@ -2333,66 +2325,6 @@ export default function SoundsScreen() {
               Upgrade to Pro - Unlock 44 Premium Sounds
             </Text>
           </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Pro Badge - shown when user has pro subscription */}
-      {pro && (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            paddingVertical: 8,
-            paddingHorizontal: 16,
-            marginHorizontal: 16,
-            marginTop: 12,
-            marginBottom: 4,
-            backgroundColor: "rgba(255, 215, 0, 0.15)",
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: "rgba(255, 215, 0, 0.3)",
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "#FFD700",
-              borderRadius: 8,
-              padding: 4,
-              marginRight: 8,
-            }}
-          >
-            <Ionicons name="star" size={16} color="#0A0903" />
-          </View>
-          <Text
-            style={{
-              color: "#FFD700",
-              fontSize: 13,
-              fontWeight: "700",
-              letterSpacing: 0.5,
-            }}
-          >
-            PRO MEMBER
-          </Text>
-          <View
-            style={{
-              marginLeft: 8,
-              paddingHorizontal: 8,
-              paddingVertical: 2,
-              backgroundColor: "rgba(255, 215, 0, 0.2)",
-              borderRadius: 6,
-            }}
-          >
-            <Text
-              style={{
-                color: "#FFD700",
-                fontSize: 10,
-                fontWeight: "600",
-              }}
-            >
-              ALL SOUNDS UNLOCKED
-            </Text>
-          </View>
         </View>
       )}
 
@@ -2884,60 +2816,6 @@ export default function SoundsScreen() {
       ))}
 
       {/* Volume Warning Banner */}
-      {showVolumeWarning && !volumeWarningDismissed && (
-        <View
-          style={{
-            position: "absolute",
-            top: 20,
-            left: 16,
-            right: 16,
-            backgroundColor: "#f59e0b",
-            borderRadius: 12,
-            padding: 12,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2,
-            shadowRadius: 4,
-            elevation: 5,
-            zIndex: 1000,
-          }}
-        >
-          <Ionicons name="volume-mute" size={20} color="white" />
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                color: "white",
-                fontSize: 13,
-                fontWeight: "600",
-                marginBottom: 2,
-              }}
-            >
-              Volume Low
-            </Text>
-            <Text
-              style={{
-                color: "rgba(255, 255, 255, 0.9)",
-                fontSize: 12,
-                fontWeight: "500",
-              }}
-            >
-              Turn up your device volume to hear the sounds
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => {
-              setShowVolumeWarning(false);
-              setVolumeWarningDismissed(true);
-            }}
-            style={{ padding: 4 }}
-          >
-            <Ionicons name="close" size={16} color="white" />
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Paywall Modal */}
       <PaywallModal

@@ -324,14 +324,6 @@ export default function SettingsScreen() {
   const handleHighContrastToggle = async (enabled: boolean) => {
     triggerHaptic("medium");
     await setHighContrastMode(enabled);
-    setInfoModalContent({
-      title: enabled ? "High Contrast Enabled" : "High Contrast Disabled",
-      message: enabled
-        ? "Text and buttons now have higher contrast for better visibility."
-        : "Text contrast has been returned to normal.",
-      icon: "checkmark-circle",
-    });
-    setInfoModalVisible(true);
   };
 
   const handleRestorePurchases = async () => {
@@ -930,49 +922,29 @@ export default function SettingsScreen() {
                   key={size}
                   onPress={() => handleTextSizeChange(size)}
                   style={{
-                    paddingVertical: 14,
+                    paddingVertical: 12,
                     paddingHorizontal: 16,
                     marginBottom: 12,
-                    borderRadius: 12,
-                    borderWidth: 2,
-                    borderColor:
-                      textSize === size ? theme.primary : theme.border,
+                    borderRadius: 24,
+                    borderWidth: textSize === size ? 0 : 2,
+                    borderColor: theme.border,
                     backgroundColor:
-                      textSize === size ? theme.primary + "15" : theme.card,
+                      textSize === size ? theme.primary : theme.card,
                     flexDirection: "row",
                     alignItems: "center",
+                    gap: 12,
                   }}
                 >
-                  <View
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      borderWidth: 2,
-                      borderColor: theme.primary,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      marginRight: 12,
-                    }}
-                  >
-                    {textSize === size && (
-                      <View
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: 5,
-                          backgroundColor: theme.primary,
-                        }}
-                      />
-                    )}
-                  </View>
+                  {textSize === size && (
+                    <Ionicons name="checkmark" size={18} color="white" />
+                  )}
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{
                         fontSize:
                           size === "small" ? 14 : size === "large" ? 18 : 16,
                         fontWeight: "600",
-                        color: theme.text,
+                        color: textSize === size ? "white" : theme.text,
                         marginBottom: 4,
                       }}
                     >
@@ -982,7 +954,10 @@ export default function SettingsScreen() {
                       style={{
                         fontSize:
                           size === "small" ? 11 : size === "large" ? 14 : 12,
-                        color: theme.textSecondary,
+                        color:
+                          textSize === size
+                            ? "rgba(255,255,255,0.8)"
+                            : theme.textSecondary,
                       }}
                     >
                       {size === "small"
@@ -1003,11 +978,16 @@ export default function SettingsScreen() {
               }}
               style={{
                 backgroundColor: theme.primary,
-                padding: 16,
-                borderRadius: 12,
+                paddingVertical: 12,
+                paddingHorizontal: 24,
+                borderRadius: 24,
                 alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+                gap: 6,
               }}
             >
+              <Ionicons name="checkmark" size={18} color="white" />
               <Text
                 style={{
                   color: "white",
@@ -1142,43 +1122,116 @@ export default function SettingsScreen() {
                 style={styles.aboutIcon}
               />
               <Text style={[styles.aboutTitle, { color: theme.text }]}>
-                White Noise Expo
+                Slumbr
               </Text>
               <Text
                 style={[styles.aboutVersion, { color: theme.textSecondary }]}
               >
                 Version 1.0.0
               </Text>
-              <Text style={[styles.aboutDescription, { color: theme.text }]}>
-                Welcome to White Noise Expo, your ultimate companion for
-                relaxation, focus, and better sleep. Our app offers a curated
-                collection of high-quality white noise sounds designed to help
-                you create the perfect ambiance for any moment.
+
+              <Text
+                style={[
+                  styles.aboutDescription,
+                  { color: theme.text, fontWeight: "700", marginTop: 16 },
+                ]}
+              >
+                Sleep better. Wake refreshed.
               </Text>
+
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
-                Whether you&apos;re working, studying, meditating, or winding
-                down for the night, our diverse range of sounds - from gentle
-                rain to ocean waves, forest ambiances to urban rhythms -
-                provides the ideal backdrop for your needs.
+                Slumbr was created with one simple goal: to help you fall asleep
+                faster and sleep more deeply. We know how frustrating it can be
+                to lie awake at night, your mind racing, struggling to switch
+                off. Thats where we come in.
               </Text>
-              <Text style={[styles.aboutDescription, { color: theme.text }]}>
-                Key Features: • ✨ Completely ad-free (even on free version - we
-                will never add ads) • 12 free sounds + 44 premium sounds
-                available • Customizable playback options • Background play
-                support • Dark mode for comfortable viewing • Favorite sound
-                selection
+
+              <Text
+                style={[
+                  styles.aboutDescription,
+                  { color: theme.text, fontWeight: "700", marginTop: 12 },
+                ]}
+              >
+                What We Do
               </Text>
+
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
-                We&apos;re committed to helping you find your perfect
-                soundscape. Thank you for choosing White Noise Expo!
+                Slumbr offers a carefully curated collection of ambient sounds
+                designed to mask distracting noises, calm your mind, and create
+                the perfect environment for restful sleep. From gentle rain and
+                ocean waves to white noise and peaceful forest soundscapes,
+                every sound has been selected to help you drift off naturally.
+              </Text>
+
+              <Text
+                style={[
+                  styles.aboutDescription,
+                  { color: theme.text, fontWeight: "700", marginTop: 12 },
+                ]}
+              >
+                Why Slumbr?
+              </Text>
+
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                • Simple by design — No complicated menus or overwhelming
+                options. Just tap, relax, and sleep.{"\n"}• Mix your perfect
+                soundscape — Combine multiple sounds to create your ideal sleep
+                environment.{"\n"}• Works offline — No internet required once
+                sounds are downloaded. Perfect for travel.{"\n"}• Battery
+                friendly — Optimised to run all night without draining your
+                device.
+              </Text>
+
+              <Text
+                style={[
+                  styles.aboutDescription,
+                  { color: theme.text, fontWeight: "700", marginTop: 12 },
+                ]}
+              >
+                Our Philosophy
+              </Text>
+
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                We believe good sleep shouldnt be complicated or expensive.
+                Slumbr is built to do one thing exceptionally well: help you
+                sleep. No gimmicks, no clutter—just soothing sounds when you
+                need them.
+              </Text>
+
+              <Text
+                style={[
+                  styles.aboutDescription,
+                  { color: theme.text, fontWeight: "700", marginTop: 12 },
+                ]}
+              >
+                Get in Touch
+              </Text>
+
+              <Text style={[styles.aboutDescription, { color: theme.text }]}>
+                Questions, feedback, or just want to say hello? Wed love to hear
+                from you.
               </Text>
             </View>
           </ScrollView>
           <TouchableOpacity
-            style={[styles.closeButton, { backgroundColor: theme.primary }]}
+            style={{
+              backgroundColor: theme.primary,
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              borderRadius: 24,
+              alignItems: "center",
+              justifyContent: "center",
+              marginHorizontal: 20,
+              marginBottom: 20,
+              flexDirection: "row",
+              gap: 6,
+            }}
             onPress={() => setAboutModalVisible(false)}
           >
-            <Text style={styles.closeButtonText}>Close</Text>
+            <Ionicons name="close" size={18} color="white" />
+            <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+              Close
+            </Text>
           </TouchableOpacity>
         </SafeAreaView>
       </Modal>
@@ -1228,10 +1281,24 @@ export default function SettingsScreen() {
             </View>
           </ScrollView>
           <TouchableOpacity
-            style={[styles.closeButton, { backgroundColor: theme.primary }]}
+            style={{
+              backgroundColor: theme.primary,
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              borderRadius: 24,
+              alignItems: "center",
+              justifyContent: "center",
+              marginHorizontal: 20,
+              marginBottom: 20,
+              flexDirection: "row",
+              gap: 6,
+            }}
             onPress={() => setContactModalVisible(false)}
           >
-            <Text style={styles.closeButtonText}>Close</Text>
+            <Ionicons name="close" size={18} color="white" />
+            <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+              Close
+            </Text>
           </TouchableOpacity>
         </SafeAreaView>
       </Modal>
@@ -1312,11 +1379,16 @@ export default function SettingsScreen() {
                 onPress={confirmQuickPlaySelection}
                 style={{
                   backgroundColor: theme.primary,
-                  padding: 16,
-                  borderRadius: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderRadius: 24,
                   alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "row",
+                  gap: 6,
                 }}
               >
+                <Ionicons name="checkmark" size={18} color="white" />
                 <Text
                   style={{
                     color: "white",
@@ -1715,11 +1787,16 @@ export default function SettingsScreen() {
               onPress={() => setInfoModalVisible(false)}
               style={{
                 backgroundColor: theme.primary,
-                padding: 16,
-                borderRadius: 12,
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                borderRadius: 24,
                 alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+                gap: 6,
               }}
             >
+              <Ionicons name="checkmark-circle" size={18} color="white" />
               <Text
                 style={{
                   color: "white",
