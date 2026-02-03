@@ -2,7 +2,6 @@ import { WHITE_NOISE_SOUNDS } from "@/constants/sound";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
 import {
-  Alert,
   FlatList,
   Platform,
   StyleSheet,
@@ -22,9 +21,11 @@ const Storage = {
 };
 
 export default function SelectFavoriteScreen({ navigation }: any) {
+  const { showToast } = useToast();
+
   const handleSelect = async (id: number) => {
     await Storage.setItem("favorite_sound_id", String(id));
-    Alert.alert("Favourite Set", "This sound is now your favourite sound.");
+    showToast("This sound is now your favourite sound", "success");
     navigation.goBack();
   };
 

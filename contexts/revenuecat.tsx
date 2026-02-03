@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Alert, Platform } from "react-native";
+import { Platform } from "react-native";
 import Purchases, {
   CustomerInfo,
   LOG_LEVEL,
@@ -63,10 +63,10 @@ export const RevenueCatProvider = ({
       // Skip RevenueCat initialization on web - SDK not supported on web
       if (Platform.OS === "web") {
         console.log(
-          "🌐 Web platform detected - RevenueCat SDK not available on web"
+          "🌐 Web platform detected - RevenueCat SDK not available on web",
         );
         console.log(
-          "✈️  Operating in offline/free mode (web doesn't support native billing)"
+          "✈️  Operating in offline/free mode (web doesn't support native billing)",
         );
         setIsPro(false);
         setIsLoading(false);
@@ -75,12 +75,12 @@ export const RevenueCatProvider = ({
 
       try {
         console.log(
-          `🚀 Starting RevenueCat initialization... (Attempt ${retryCount + 1}/${MAX_RETRIES + 1})`
+          `🚀 Starting RevenueCat initialization... (Attempt ${retryCount + 1}/${MAX_RETRIES + 1})`,
         );
         console.log("📱 Platform:", Platform.OS);
         console.log(
           "🔑 API Key:",
-          REVENUECAT_CONFIG.apiKey ? "✓ Present" : "✗ Missing"
+          REVENUECAT_CONFIG.apiKey ? "✓ Present" : "✗ Missing",
         );
 
         // Enable debug logs for development (set to ERROR for production)
@@ -105,14 +105,14 @@ export const RevenueCatProvider = ({
         try {
           const infoPromise = Purchases.getCustomerInfo();
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Timeout")), 3000)
+            setTimeout(() => reject(new Error("Timeout")), 3000),
           );
           const info = await Promise.race([infoPromise, timeoutPromise]);
           updateCustomerInfo(info as CustomerInfo);
         } catch (infoError) {
           console.warn(
             "⚠️ Could not fetch customer info (likely offline):",
-            infoError
+            infoError,
           );
           // Offline mode: default to free tier, user can restore purchases when online
           setIsPro(false);
@@ -122,7 +122,7 @@ export const RevenueCatProvider = ({
         try {
           const offeringsPromise = Purchases.getOfferings();
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Timeout")), 3000)
+            setTimeout(() => reject(new Error("Timeout")), 3000),
           );
           const fetchedOfferings = await Promise.race([
             offeringsPromise,
@@ -134,7 +134,7 @@ export const RevenueCatProvider = ({
             console.log(
               "📦 Loaded offerings:",
               off.current.availablePackages.length,
-              "packages"
+              "packages",
             );
           } else {
             console.warn("⚠️ No current offering found");
@@ -142,7 +142,7 @@ export const RevenueCatProvider = ({
         } catch (offeringError) {
           console.warn(
             "⚠️ Could not fetch offerings (likely offline):",
-            offeringError
+            offeringError,
           );
           // Offline mode: offerings will be null, but app continues to work
         }
@@ -162,7 +162,7 @@ export const RevenueCatProvider = ({
             error?.message?.includes("Unauthorized"))
         ) {
           console.log(
-            `⏳ Retrying initialization in 2 seconds... (${retryCount + 1}/${MAX_RETRIES})`
+            `⏳ Retrying initialization in 2 seconds... (${retryCount + 1}/${MAX_RETRIES})`,
           );
           setTimeout(() => {
             setRetryCount(retryCount + 1);
@@ -185,7 +185,7 @@ export const RevenueCatProvider = ({
     // Debug: Log all active entitlements
     console.log(
       "🔍 Active entitlements:",
-      Object.keys(info.entitlements.active)
+      Object.keys(info.entitlements.active),
     );
     console.log("🔍 Looking for entitlement:", REVENUECAT_CONFIG.entitlementId);
 
@@ -212,7 +212,7 @@ export const RevenueCatProvider = ({
   };
 
   const purchasePackage = async (
-    pkg: PurchasesPackage
+    pkg: PurchasesPackage,
   ): Promise<{ success: boolean }> => {
     try {
       console.log("� Attempting purchase:", pkg.identifier);
@@ -220,7 +220,7 @@ export const RevenueCatProvider = ({
       console.log("💳 Purchase completed, updating customer info...");
       console.log(
         "🔍 Entitlements after purchase:",
-        Object.keys(info.entitlements.active)
+        Object.keys(info.entitlements.active),
       );
       updateCustomerInfo(info);
       console.log("✅ Purchase successful");
@@ -231,9 +231,9 @@ export const RevenueCatProvider = ({
         return { success: false };
       }
       console.error("❌ Error purchasing package:", error);
-      Alert.alert(
-        "Purchase Failed",
-        error.message || "Unable to complete purchase. Please try again."
+      showToast(
+        error.message || "Unable to complete purchase. Please try again.",
+        "error",
       );
       return { success: false };
     }
@@ -250,22 +250,13 @@ export const RevenueCatProvider = ({
 
       if (hasActiveEntitlement) {
         console.log("✅ Purchases restored successfully");
-        Alert.alert("Success!", "Your purchases have been restored.");
         return { success: true };
       } else {
         console.log("ℹ️ No purchases to restore");
-        Alert.alert(
-          "No Purchases Found",
-          "We couldn't find any previous purchases to restore."
-        );
         return { success: false };
       }
     } catch (error: any) {
       console.error("❌ Error restoring purchases:", error);
-      Alert.alert(
-        "Restore Failed",
-        error.message || "Unable to restore purchases. Please try again."
-      );
       return { success: false };
     }
   };

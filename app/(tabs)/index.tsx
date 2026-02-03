@@ -13,6 +13,8 @@ import * as Haptics from "expo-haptics";
 import * as Network from "expo-network";
 
 import { useAccessibility } from "@/contexts/accessibility";
+import { useNotification } from "@/contexts/notification";
+import { useOnboarding } from "@/contexts/onboarding";
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useRevenueCat } from "@/contexts/revenuecat";
 import { useScroll } from "@/contexts/scroll";
@@ -22,7 +24,6 @@ import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   AppState,
   Easing,
@@ -111,12 +112,34 @@ function MixerModal({
   pro: boolean;
   isPlaying: boolean;
 }) {
+  const [optimisticToggles, setOptimisticToggles] = useState<Set<number>>(
+    new Set(),
+  );
+
   useEffect(() => {
     const volumes = new Map<number, number>();
     activeSounds.forEach((data, id) => {
       volumes.set(id, data.volume);
     });
+    // Clear optimistic state once actual state updates
+    setOptimisticToggles(new Set());
   }, [activeSounds]);
+
+  const handleToggleSound = (soundItem: any) => {
+    // Optimistically update the UI
+    setOptimisticToggles((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(soundItem.id)) {
+        newSet.delete(soundItem.id);
+      } else {
+        newSet.add(soundItem.id);
+      }
+      return newSet;
+    });
+
+    // Call the actual toggle function
+    onToggleSound(soundItem);
+  };
 
   return (
     <Modal
@@ -183,22 +206,32 @@ function MixerModal({
               marginBottom: 12,
               backgroundColor: theme.primary,
               borderRadius: 24,
+              flexDirection: "row",
+              gap: 8,
+              justifyContent: "center",
             }}
           >
+            <Ionicons name="checkmark" size={18} color="white" />
             <Text style={{ color: "white", fontWeight: "600" }}>Done</Text>
           </TouchableOpacity>
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {WHITE_NOISE_SOUNDS.map((soundItem) => {
-              const isActive = activeSounds.has(soundItem.id);
+              // Use optimistic state for UI feedback, actual state for logic
+              const isOptimistic = optimisticToggles.has(soundItem.id);
+              const isActuallyActive = activeSounds.has(soundItem.id);
+              const isActive = isOptimistic
+                ? !isActuallyActive
+                : isActuallyActive;
               const isLocked = soundItem.premium && !pro;
 
-              // First sound in the map is the original sound that started playing
+              // First sound in the map is the original sound that started playing (use actual state)
               const firstSoundId =
                 activeSounds.size > 0
                   ? Array.from(activeSounds.keys())[0]
                   : null;
-              const isFirstSound = isActive && soundItem.id === firstSoundId;
+              const isFirstSound =
+                isActuallyActive && soundItem.id === firstSoundId;
               const cannotUnselect =
                 isFirstSound && isPlaying && activeSounds.size > 1;
 
@@ -317,7 +350,7 @@ function MixerModal({
                     )}
                     <Switch
                       value={isActive}
-                      onValueChange={() => onToggleSound(soundItem)}
+                      onValueChange={() => handleToggleSound(soundItem)}
                       disabled={cannotUnselect}
                       trackColor={{
                         false: theme.border,
@@ -733,6 +766,7 @@ export default function SoundsScreen() {
     setStopMainSounds,
   } = useQuickPlay();
   const { setScrollViewRef } = useScroll();
+  const { setHasCompletedOnboarding } = useOnboarding();
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const { textSize, highContrastMode } = useAccessibility();
@@ -785,6 +819,7 @@ export default function SoundsScreen() {
 
   // RevenueCat - check if user has Pro access
   const { isPro: pro, isLoading: revenueCatLoading } = useRevenueCat();
+  const { showNotification } = useNotification();
 
   // Paywall state
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -1014,6 +1049,13 @@ export default function SoundsScreen() {
     }
   }, [activeSounds.size, selectedSounds.size, playerSlide, overlayOpacity]);
 
+  // Clear selected sounds when active sounds change (when a new sound starts playing)
+  useEffect(() => {
+    if (activeSounds.size > 0) {
+      setSelectedSounds(new Set());
+    }
+  }, [activeSounds.size]);
+
   // Load favorites from storage
   useEffect(() => {
     const loadFavorites = async () => {
@@ -1152,6 +1194,38 @@ export default function SoundsScreen() {
     });
   }, []);
 
+  // Retry helper function for audio operations
+  const retryAudioOperation = async <T,>(
+    operation: () => Promise<T>,
+    operationName: string,
+    maxRetries: number = 3,
+    delayMs: number = 500,
+  ): Promise<T | null> => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(
+          `🔄 ${operationName} (attempt ${attempt}/${maxRetries})...`,
+        );
+        const result = await operation();
+        console.log(`✅ ${operationName} succeeded`);
+        return result;
+      } catch (error) {
+        console.error(
+          `❌ ${operationName} failed on attempt ${attempt}:`,
+          error,
+        );
+        if (attempt < maxRetries) {
+          console.log(
+            `⏳ Retrying in ${delayMs}ms... (${maxRetries - attempt} retries left)`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    console.error(`❌ ${operationName} failed after ${maxRetries} attempts`);
+    return null;
+  };
+
   // Toggle sound in mixer
   const toggleSoundInMixer = async (soundItem: any) => {
     const newActiveSounds = new Map(activeSounds);
@@ -1259,8 +1333,17 @@ export default function SoundsScreen() {
           console.log(
             `⏯️  Triggering playback for mixer sound ${soundItem.id}...`,
           );
-          newSound.playAsync().catch((err) => {
-            console.error(`Error playing mixer sound ${soundItem.id}:`, err);
+          retryAudioOperation(
+            () => newSound.playAsync(),
+            `Playing mixer sound ${soundItem.id}`,
+            3,
+            500,
+          ).catch((err) => {
+            console.error(
+              `Error playing mixer sound ${soundItem.id} after retries:`,
+              err,
+            );
+            showSnackbar(`Failed to play ${soundItem.name}`);
           });
         }
 
@@ -1280,9 +1363,10 @@ export default function SoundsScreen() {
           return newSet;
         });
 
-        Alert.alert(
-          "Error",
+        showNotification(
+          "Playback Error",
           "Could not load sound. Please check your internet connection.",
+          "error",
         );
         console.error("Error playing sound:", error);
         return;
@@ -1705,8 +1789,7 @@ export default function SoundsScreen() {
       return;
     }
 
-    // Immediate visual feedback - show selection border
-    setSelectedSounds(new Set([soundItem.id]));
+    // Show loading state immediately
     setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
 
     console.log(`🎵 Switching to sound ${soundItem.id} (${soundItem.name})...`);
@@ -1729,9 +1812,24 @@ export default function SoundsScreen() {
         return newSet;
       });
 
-      // Start playback
+      // Start playback with retry
       console.log(`⏯️  Starting playback for sound ${soundItem.id}...`);
-      await soundData.sound.playAsync();
+      const playSuccess = await retryAudioOperation(
+        () => soundData.sound.playAsync(),
+        `Playing sound ${soundItem.id}`,
+        3,
+        500,
+      );
+
+      if (!playSuccess) {
+        showSnackbar(`Failed to play ${soundItem.name} after 3 attempts`);
+        setLoadingSounds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(soundItem.id);
+          return newSet;
+        });
+        return;
+      }
 
       // Fade in to target volume
       fadeInSound(
@@ -1767,7 +1865,11 @@ export default function SoundsScreen() {
       });
       setSelectedSounds(new Set());
 
-      Alert.alert("Error", "Could not play sound. Please try again later.");
+      showNotification(
+        "Playback Error",
+        "Could not play sound. Please try again later.",
+        "error",
+      );
       console.error("Error playing sound:", error);
     }
   };
@@ -1805,7 +1907,12 @@ export default function SoundsScreen() {
         if (data?.sound) {
           try {
             await data.sound.setVolumeAsync(0);
-            await data.sound.playAsync();
+            await retryAudioOperation(
+              () => data.sound.playAsync(),
+              `Resuming sound ${data.soundItem?.id}`,
+              3,
+              300,
+            );
             fadeInSound(data.sound, data.volume, 1000).catch((err) => {
               console.error("Error during fade in:", err);
             });
@@ -1829,10 +1936,14 @@ export default function SoundsScreen() {
         }
       }
     } catch (error) {
-      Alert.alert("Error", "Could not resume sounds.");
+      showNotification(
+        "Playback Error",
+        "Could not resume sounds. Please try again.",
+        "error",
+      );
       console.error("Error resuming sounds:", error);
     }
-  }, [activeSounds, fadeInSound]);
+  }, [activeSounds, fadeInSound, showNotification]);
 
   const stopAllSounds = useCallback(async () => {
     try {
@@ -1906,10 +2017,10 @@ export default function SoundsScreen() {
         console.log("📢 Notification dismiss skipped:", notifError);
       }
     } catch (error) {
-      Alert.alert("Error", "Could not stop sounds.");
+      showNotification("Playback Error", "Could not stop sounds.", "error");
       console.error("Error stopping sounds:", error);
     }
-  }, [activeSounds]);
+  }, [activeSounds, showNotification]);
 
   // Register stopAllSounds callback with context - use ref to avoid re-renders
   const stopAllSoundsRef = useRef(stopAllSounds);
@@ -2086,7 +2197,7 @@ export default function SoundsScreen() {
             style={[
               styles.soundCard,
               { backgroundColor: theme.surface, borderColor: theme.border },
-              (isActive || isQuickPlayActive || isSelected) && {
+              (isActive || isQuickPlayActive) && {
                 borderColor: theme.primary,
                 backgroundColor: theme.card,
                 borderWidth: 2.5,

@@ -1,9 +1,9 @@
+import { useNotification } from "@/contexts/notification";
 import { Analytics } from "@/utils/analytics";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -22,6 +22,7 @@ interface PaywallModalProps {
 
 export function PaywallModal({ visible, onClose }: PaywallModalProps) {
   const { theme } = useTheme();
+  const { showNotification } = useNotification();
   const { isPro, offerings, purchasePackage, restorePurchases } =
     useRevenueCat();
   const [loading, setLoading] = useState(false);
@@ -41,9 +42,10 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
 
     if (result.success) {
       Analytics.trackPurchaseCompleted(pkg.identifier, pkg.product.priceString);
-      Alert.alert(
-        "Welcome to Slumbr Pro!",
-        "You now have access to all premium sounds, features, and a completely ad-free experience!"
+      showNotification(
+        "Welcome to Pro!",
+        "You now have access to all premium sounds, features, and an ad-free experience!",
+        "success",
       );
       onClose();
     } else {
@@ -161,7 +163,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                     .filter(
                       (pkg) =>
                         pkg.packageType === "MONTHLY" ||
-                        pkg.packageType === "ANNUAL"
+                        pkg.packageType === "ANNUAL",
                     )
                     .sort((a, b) => {
                       // Show ANNUAL first, then MONTHLY
@@ -174,7 +176,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                       // Calculate savings for yearly
                       const monthlyCost =
                         offerings.availablePackages.find(
-                          (p) => p.packageType === "MONTHLY"
+                          (p) => p.packageType === "MONTHLY",
                         )?.product.price || 0;
                       const yearlyCost = pkg.product.price || 0;
                       const monthlySavings = (
@@ -214,7 +216,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                                 {isAnnual
                                   ? "per year"
                                   : `${(pkg.product.price / 12).toFixed(
-                                      2
+                                      2,
                                     )}$/month`}
                               </Text>
                             </>
@@ -226,7 +228,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
 
                 {/* Lifetime Option (Secondary CTA - Slightly Hidden) */}
                 {offerings.availablePackages.find(
-                  (pkg) => pkg.packageType === "LIFETIME"
+                  (pkg) => pkg.packageType === "LIFETIME",
                 ) && (
                   <View style={styles.lifetimeSection}>
                     <Text
@@ -245,8 +247,8 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                       onPress={() =>
                         handlePurchase(
                           offerings.availablePackages.find(
-                            (pkg) => pkg.packageType === "LIFETIME"
-                          )!
+                            (pkg) => pkg.packageType === "LIFETIME",
+                          )!,
                         )
                       }
                       disabled={loading}
@@ -271,7 +273,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                           >
                             {
                               offerings.availablePackages.find(
-                                (pkg) => pkg.packageType === "LIFETIME"
+                                (pkg) => pkg.packageType === "LIFETIME",
                               )?.product.priceString
                             }
                             {" one-time"}

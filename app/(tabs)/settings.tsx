@@ -3,9 +3,11 @@ import { PaywallModal } from "@/components/PaywallModal";
 import { WHITE_NOISE_SOUNDS } from "@/constants/sound";
 import { useAccessibility } from "@/contexts/accessibility";
 import { useBackgroundPlay } from "@/contexts/backgroundplay";
+import { useNotification } from "@/contexts/notification";
 import { useRevenueCat } from "@/contexts/revenuecat";
 import { useScroll } from "@/contexts/scroll";
 import { themes, useTheme } from "@/contexts/themecontext";
+import { useToast } from "@/contexts/toast";
 
 import { Analytics } from "@/utils/analytics";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,7 +18,6 @@ import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Platform,
@@ -29,9 +30,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const darkLogo = require("../../assets/images/slumbr_logo_dark.svg");
-const whiteLogo = require("../../assets/images/slumbr_logo_light.svg");
 
 /** Web + native storage shim */
 const Storage = {
@@ -84,6 +82,8 @@ export default function SettingsScreen() {
   } = useAccessibility();
 
   const { isPro: pro, restorePurchases } = useRevenueCat();
+  const { showToast } = useToast();
+  const { showNotification } = useNotification();
   const [favoriteSoundId, setFavoriteSoundId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [aboutModalVisible, setAboutModalVisible] = useState(false);
@@ -92,8 +92,8 @@ export default function SettingsScreen() {
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [confirmClearQuickPlayVisible, setConfirmClearQuickPlayVisible] =
     useState(false);
-  const [successMessageVisible, setSuccessMessageVisible] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessageVisible] = useState(false);
+  const [successMessage] = useState("");
   const [selectedSoundForConfirm, setSelectedSoundForConfirm] = useState<{
     id: number;
     name: string;
@@ -300,12 +300,30 @@ export default function SettingsScreen() {
     setAboutModalVisible(true);
   };
 
-  const handleRatePress = () => {
-    // Could implement custom modal here too if desired
-    Alert.alert("Rate App", "Would you like to rate our app?", [
-      { text: "Later", style: "cancel" },
-      { text: "Rate Now", onPress: () => console.log("Open store link") },
-    ]);
+  const handleRatePress = async () => {
+    try {
+      const StoreReview = await import("react-native-store-review");
+
+      await StoreReview.requestReview();
+      Analytics.track("Rate App", { action: "native_review_requested" });
+    } catch {
+      // Fallback: open app store if native review unavailable
+      try {
+        const url =
+          Platform.OS === "ios"
+            ? "itms-apps://apps.apple.com/app/slumbr/XXXXXXX?action=write-review"
+            : "https://play.google.com/store/apps/details?id=com.slumbr.app";
+        await Linking.openURL(url);
+        Analytics.track("Rate App", { action: "opened_store_fallback" });
+      } catch (linkError) {
+        showNotification(
+          "Rate App",
+          "Could not open review. Please try again later.",
+          "error",
+        );
+        console.error("Error requesting review:", linkError);
+      }
+    }
   };
 
   const handleTermsPress = () => {
@@ -536,10 +554,9 @@ export default function SettingsScreen() {
           switchValue={themeMode === "dark"}
           onSwitchChange={() => {
             if (highContrastMode) {
-              Alert.alert(
-                "High Contrast Mode Active",
+              showToast(
                 "Theme switching is disabled while High Contrast mode is enabled. Please disable High Contrast mode first if you want to change the theme.",
-                [{ text: "OK" }],
+                "warning",
               );
               return;
             }
@@ -1672,11 +1689,16 @@ export default function SettingsScreen() {
                 onPress={confirmClearFavorites}
                 style={{
                   backgroundColor: theme.error,
-                  padding: 16,
-                  borderRadius: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 24,
+                  borderRadius: 24,
                   alignItems: "center",
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: 8,
                 }}
               >
+                <Ionicons name="trash" size={20} color="white" />
                 <Text
                   style={{
                     color: "white",
@@ -1691,15 +1713,20 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 onPress={() => setConfirmClearFavoritesVisible(false)}
                 style={{
-                  backgroundColor: theme.border,
-                  padding: 16,
-                  borderRadius: 12,
+                  backgroundColor: theme.primary,
+                  paddingVertical: 12,
+                  paddingHorizontal: 24,
+                  borderRadius: 24,
                   alignItems: "center",
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: 8,
                 }}
               >
+                <Ionicons name="close" size={20} color="white" />
                 <Text
                   style={{
-                    color: theme.text,
+                    color: "white",
                     fontSize: 16,
                     fontWeight: "600",
                   }}
