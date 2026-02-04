@@ -5,23 +5,27 @@ import {
   SoundCategory,
   WHITE_NOISE_SOUNDS,
 } from "@/constants/sound";
-import { Analytics } from "@/utils/analytics";
-import { soundCache } from "@/utils/soundCache";
-import { Ionicons } from "@expo/vector-icons";
-import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
-import * as Haptics from "expo-haptics";
-import * as Network from "expo-network";
-
 import { useAccessibility } from "@/contexts/accessibility";
 import { useNotification } from "@/contexts/notification";
-import { useOnboarding } from "@/contexts/onboarding";
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useRevenueCat } from "@/contexts/revenuecat";
 import { useScroll } from "@/contexts/scroll";
+import { Analytics } from "@/utils/analytics";
+import { soundCache } from "@/utils/soundCache";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
+import * as Haptics from "expo-haptics";
+import * as Network from "expo-network";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -46,6 +50,9 @@ import {
   setupAudioNotifications,
   showPlayingNotification,
 } from "../../utils/audioNotification";
+
+// Import the extracted SoundCard component
+import { SoundCard, SoundItem, Theme } from "./SoundCard";
 
 /* ---------- Platform helpers ---------- */
 const isWeb = Platform.OS === "web";
@@ -84,14 +91,13 @@ const Storage = {
 };
 
 /* ---------- Mixer Modal ---------- */
-function MixerModal({
+const MixerModal = React.memo(function MixerModal({
   visible,
   onClose,
   theme,
   themeMode,
   activeSounds,
   onToggleSound,
-  onVolumeChange,
   favorites,
   onToggleFavorite,
   pro,
@@ -99,14 +105,13 @@ function MixerModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  theme: any;
+  theme: Theme;
   themeMode: "light" | "dark";
   activeSounds: Map<
     number,
     { sound: any; soundItem: any; volume: number; isMuted: boolean }
   >;
   onToggleSound: (soundItem: any) => void;
-  onVolumeChange: (soundId: number, volume: number) => void;
   favorites: Set<number>;
   onToggleFavorite: (soundId: number) => void;
   pro: boolean;
@@ -117,29 +122,42 @@ function MixerModal({
   );
 
   useEffect(() => {
-    const volumes = new Map<number, number>();
-    activeSounds.forEach((data, id) => {
-      volumes.set(id, data.volume);
-    });
-    // Clear optimistic state once actual state updates
     setOptimisticToggles(new Set());
   }, [activeSounds]);
 
-  const handleToggleSound = (soundItem: any) => {
-    // Optimistically update the UI
-    setOptimisticToggles((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(soundItem.id)) {
-        newSet.delete(soundItem.id);
-      } else {
-        newSet.add(soundItem.id);
-      }
-      return newSet;
-    });
+  const handleToggleSound = useCallback(
+    (soundItem: any) => {
+      setOptimisticToggles((prev) => {
+        const newSet = new Set(prev);
+        if (newSet.has(soundItem.id)) {
+          newSet.delete(soundItem.id);
+        } else {
+          newSet.add(soundItem.id);
+        }
+        return newSet;
+      });
+      onToggleSound(soundItem);
+    },
+    [onToggleSound],
+  );
 
-    // Call the actual toggle function
-    onToggleSound(soundItem);
-  };
+  const handleClose = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onClose();
+  }, [onClose]);
+
+  const handleFavoritePress = useCallback(
+    (soundId: number) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onToggleFavorite(soundId);
+    },
+    [onToggleFavorite],
+  );
+
+  // Memoize first sound ID calculation
+  const firstSoundId = useMemo(() => {
+    return activeSounds.size > 0 ? Array.from(activeSounds.keys())[0] : null;
+  }, [activeSounds]);
 
   return (
     <Modal
@@ -148,88 +166,38 @@ function MixerModal({
       transparent
       onRequestClose={onClose}
     >
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "#0006",
-          justifyContent: "flex-end",
-        }}
-      >
+      <View style={mixerStyles.overlay}>
         <View
-          style={{
-            backgroundColor: theme.surface,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            padding: 24,
-            borderTopWidth: 1,
-            borderColor: theme.border,
-            maxHeight: "80%",
-          }}
+          style={[
+            mixerStyles.container,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
         >
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 6,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: "700",
-                color: theme.text,
-              }}
-            >
+          <View style={mixerStyles.header}>
+            <Text style={[mixerStyles.title, { color: theme.text }]}>
               Sound Mixer
             </Text>
           </View>
-          <Text
-            style={{
-              opacity: 0.7,
-              color: theme.textSecondary,
-              marginBottom: 20,
-            }}
-          >
+          <Text style={[mixerStyles.subtitle, { color: theme.textSecondary }]}>
             Mix multiple sounds together
           </Text>
 
           <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onClose();
-            }}
-            style={{
-              paddingVertical: 12,
-              paddingHorizontal: 24,
-              alignItems: "center",
-              marginBottom: 12,
-              backgroundColor: theme.primary,
-              borderRadius: 24,
-              flexDirection: "row",
-              gap: 8,
-              justifyContent: "center",
-            }}
+            onPress={handleClose}
+            style={[mixerStyles.doneButton, { backgroundColor: theme.primary }]}
           >
             <Ionicons name="checkmark" size={18} color="white" />
-            <Text style={{ color: "white", fontWeight: "600" }}>Done</Text>
+            <Text style={mixerStyles.doneButtonText}>Done</Text>
           </TouchableOpacity>
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {WHITE_NOISE_SOUNDS.map((soundItem) => {
-              // Use optimistic state for UI feedback, actual state for logic
               const isOptimistic = optimisticToggles.has(soundItem.id);
               const isActuallyActive = activeSounds.has(soundItem.id);
               const isActive = isOptimistic
                 ? !isActuallyActive
                 : isActuallyActive;
               const isLocked = soundItem.premium && !pro;
-
-              // First sound in the map is the original sound that started playing (use actual state)
-              const firstSoundId =
-                activeSounds.size > 0
-                  ? Array.from(activeSounds.keys())[0]
-                  : null;
               const isFirstSound =
                 isActuallyActive && soundItem.id === firstSoundId;
               const cannotUnselect =
@@ -238,92 +206,58 @@ function MixerModal({
               return (
                 <View
                   key={soundItem.id}
-                  style={{
-                    marginBottom: 16,
-                    padding: 16,
-                    borderRadius: 12,
-                    backgroundColor: isActive ? theme.card : theme.background,
-                    borderWidth: 1,
-                    borderColor: isActive ? theme.primary : theme.border,
-                  }}
+                  style={[
+                    mixerStyles.soundItem,
+                    {
+                      backgroundColor: isActive ? theme.card : theme.background,
+                      borderColor: isActive ? theme.primary : theme.border,
+                    },
+                  ]}
                 >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                    }}
-                  >
+                  <View style={mixerStyles.soundRow}>
                     <View
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: soundItem.color,
-                        justifyContent: "center",
-                        alignItems: "center",
-                        marginRight: 12,
-                      }}
+                      style={[
+                        mixerStyles.soundIcon,
+                        { backgroundColor: soundItem.color },
+                      ]}
                     >
                       <Ionicons
-                        name={
-                          soundItem.icon as React.ComponentProps<
-                            typeof Ionicons
-                          >["name"]
-                        }
+                        name={soundItem.icon as any}
                         size={20}
                         color="white"
                       />
                     </View>
-                    <View style={{ flex: 1 }}>
+                    <View style={mixerStyles.soundInfo}>
                       <Text
-                        style={{
-                          color: theme.text,
-                          fontSize: 16,
-                          fontWeight: "600",
-                        }}
+                        style={[mixerStyles.soundName, { color: theme.text }]}
                       >
                         {soundItem.name}
                       </Text>
                       <Text
-                        style={{ color: theme.textSecondary, fontSize: 12 }}
+                        style={[
+                          mixerStyles.soundDesc,
+                          { color: theme.textSecondary },
+                        ]}
                       >
                         {soundItem.description}
                       </Text>
                     </View>
                     {isLocked ? (
                       <View
-                        style={{
-                          backgroundColor:
-                            themeMode === "light" ? "#9b8fa8" : "#8b5cf6",
-                          paddingHorizontal: 10,
-                          paddingVertical: 4,
-                          borderRadius: 6,
-                          marginRight: 8,
-                        }}
+                        style={[
+                          mixerStyles.proBadge,
+                          {
+                            backgroundColor:
+                              themeMode === "light" ? "#9b8fa8" : "#8b5cf6",
+                          },
+                        ]}
                       >
-                        <Text
-                          style={{
-                            color: "white",
-                            fontSize: 10,
-                            fontWeight: "700",
-                            letterSpacing: 0.5,
-                          }}
-                        >
-                          PRO
-                        </Text>
+                        <Text style={mixerStyles.proBadgeText}>PRO</Text>
                       </View>
                     ) : (
                       <TouchableOpacity
-                        onPress={() => {
-                          Haptics.impactAsync(
-                            Haptics.ImpactFeedbackStyle.Light,
-                          );
-                          onToggleFavorite(soundItem.id);
-                        }}
-                        style={{
-                          padding: 8,
-                          marginRight: 8,
-                        }}
+                        onPress={() => handleFavoritePress(soundItem.id)}
+                        style={mixerStyles.heartButton}
                       >
                         <Ionicons
                           name={
@@ -345,17 +279,14 @@ function MixerModal({
                         name="lock-closed"
                         size={16}
                         color={theme.textSecondary}
-                        style={{ marginRight: 8, opacity: 0.6 }}
+                        style={mixerStyles.lockIcon}
                       />
                     )}
                     <Switch
                       value={isActive}
                       onValueChange={() => handleToggleSound(soundItem)}
                       disabled={cannotUnselect}
-                      trackColor={{
-                        false: theme.border,
-                        true: theme.primary,
-                      }}
+                      trackColor={{ false: theme.border, true: theme.primary }}
                       thumbColor={isActive ? "white" : theme.textSecondary}
                     />
                   </View>
@@ -367,10 +298,84 @@ function MixerModal({
       </View>
     </Modal>
   );
-}
+});
+
+const mixerStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "#0006", justifyContent: "flex-end" },
+  container: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    borderTopWidth: 1,
+    maxHeight: "80%",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  title: { fontSize: 22, fontWeight: "700" },
+  subtitle: { opacity: 0.7, marginBottom: 20 },
+  doneButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    marginBottom: 12,
+    borderRadius: 24,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+  },
+  doneButtonText: { color: "white", fontWeight: "600" },
+  soundItem: {
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  soundRow: { flexDirection: "row", alignItems: "center" },
+  soundIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  soundInfo: { flex: 1 },
+  soundName: { fontSize: 16, fontWeight: "600" },
+  soundDesc: { fontSize: 12 },
+  proBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  proBadgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  heartButton: { padding: 8, marginRight: 8 },
+  lockIcon: { marginRight: 8, opacity: 0.6 },
+});
 
 /* ---------- Timer Modal ---------- */
-function TimerModal({
+const TIMER_OPTIONS = [
+  { label: "No Timer", value: null },
+  { label: "5 minutes", value: 5 },
+  { label: "10 minutes", value: 10 },
+  { label: "15 minutes", value: 15 },
+  { label: "30 minutes", value: 30 },
+  { label: "1 hour", value: 60 },
+  { label: "3 hours", value: 180 },
+  { label: "6 hours", value: 360 },
+  { label: "8 hours", value: 480 },
+];
+
+const TimerModal = React.memo(function TimerModal({
   visible,
   onClose,
   onSetTimer,
@@ -380,176 +385,149 @@ function TimerModal({
   visible: boolean;
   onClose: () => void;
   onSetTimer: (minutes: number | null) => void;
-  theme: any;
+  theme: Theme;
   currentTimer: number | null;
 }) {
-  const [isVisible, setIsVisible] = React.useState(visible);
-
-  React.useEffect(() => {
-    if (visible) {
-      setIsVisible(true);
-    }
-  }, [visible]);
-
-  const handleClose = () => {
-    setIsVisible(false);
-    setTimeout(() => {
+  const handleSelectTimer = useCallback(
+    (value: number | null) => {
+      onSetTimer(value);
       onClose();
-    }, 300);
-  };
+    },
+    [onSetTimer, onClose],
+  );
 
-  const handleSelectTimer = (value: number | null) => {
-    onSetTimer(value);
-    handleClose();
-  };
-
-  const timerOptions = [
-    { label: "No Timer", value: null },
-    { label: "5 minutes", value: 5 },
-    { label: "10 minutes", value: 10 },
-    { label: "15 minutes", value: 15 },
-    { label: "30 minutes", value: 30 },
-    { label: "1 hour", value: 60 },
-    { label: "3 hours", value: 180 },
-    { label: "6 hours", value: 360 },
-    { label: "8 hours", value: 480 },
-  ];
+  const handleClose = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onClose();
+  }, [onClose]);
 
   return (
     <Modal
-      visible={isVisible}
+      visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={handleClose}
+      onRequestClose={onClose}
     >
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "#0006",
-          justifyContent: "flex-end",
-        }}
-      >
+      <View style={timerStyles.overlay}>
         <View
-          style={{
-            backgroundColor: theme.surface,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            padding: 24,
-            borderTopWidth: 1,
-            borderColor: theme.border,
-            maxHeight: "70%",
-          }}
+          style={[
+            timerStyles.container,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
         >
           <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              handleClose();
-            }}
-            style={{
-              paddingVertical: 12,
-              paddingHorizontal: 24,
-              alignItems: "center",
-              marginBottom: 12,
-              backgroundColor: theme.primary,
-              borderRadius: 24,
-              flexDirection: "row",
-              justifyContent: "center",
-              gap: 8,
-            }}
+            onPress={handleClose}
+            style={[timerStyles.doneButton, { backgroundColor: theme.primary }]}
           >
             <Ionicons name="checkmark" size={20} color="white" />
-            <Text style={{ color: "white", fontWeight: "600" }}>Done</Text>
+            <Text style={timerStyles.doneButtonText}>Done</Text>
           </TouchableOpacity>
 
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 6,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: "700",
-                color: theme.text,
-              }}
-            >
+          <View style={timerStyles.header}>
+            <Text style={[timerStyles.title, { color: theme.text }]}>
               Sleep Timer
             </Text>
           </View>
-          <Text
-            style={{
-              opacity: 0.7,
-              color: theme.textSecondary,
-              marginBottom: 20,
-            }}
-          >
+          <Text style={[timerStyles.subtitle, { color: theme.textSecondary }]}>
             Set how long the sound should play
           </Text>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {timerOptions.map((option, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => handleSelectTimer(option.value)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: 16,
-                  borderRadius: 12,
-                  backgroundColor:
-                    currentTimer === option.value
-                      ? theme.primary + "20"
-                      : theme.card,
-                  marginBottom: 8,
-                  borderWidth: currentTimer === option.value ? 2 : 1,
-                  borderColor:
-                    currentTimer === option.value
-                      ? theme.primary
-                      : theme.border,
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={option.value === null ? "close-circle" : "timer"}
-                  size={24}
-                  color={
-                    currentTimer === option.value
-                      ? theme.primary
-                      : theme.textSecondary
-                  }
-                />
-                <Text
-                  style={{
-                    color: theme.text,
-                    fontSize: 16,
-                    fontWeight: currentTimer === option.value ? "600" : "400",
-                    marginLeft: 12,
-                    flex: 1,
-                  }}
+            {TIMER_OPTIONS.map((option, index) => {
+              const isSelected = currentTimer === option.value;
+              return (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => handleSelectTimer(option.value)}
+                  style={[
+                    timerStyles.option,
+                    {
+                      backgroundColor: isSelected
+                        ? theme.primary + "20"
+                        : theme.card,
+                      borderWidth: isSelected ? 2 : 1,
+                      borderColor: isSelected ? theme.primary : theme.border,
+                    },
+                  ]}
+                  activeOpacity={0.7}
                 >
-                  {option.label}
-                </Text>
-                {currentTimer === option.value && (
                   <Ionicons
-                    name="checkmark-circle"
+                    name={option.value === null ? "close-circle" : "timer"}
                     size={24}
-                    color={theme.primary}
+                    color={isSelected ? theme.primary : theme.textSecondary}
                   />
-                )}
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      timerStyles.optionText,
+                      {
+                        color: theme.text,
+                        fontWeight: isSelected ? "600" : "400",
+                      },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={24}
+                      color={theme.primary}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       </View>
     </Modal>
   );
-}
+});
+
+const timerStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "#0006", justifyContent: "flex-end" },
+  container: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    borderTopWidth: 1,
+    maxHeight: "70%",
+  },
+  doneButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    marginBottom: 12,
+    borderRadius: 24,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
+  doneButtonText: { color: "white", fontWeight: "600" },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  title: { fontSize: 22, fontWeight: "700" },
+  subtitle: { opacity: 0.7, marginBottom: 20 },
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  optionText: { fontSize: 16, marginLeft: 12, flex: 1 },
+});
 
 /* ================== EMPTY STATE ================== */
-function EmptyPlayerState({ theme }: { theme: any }) {
+const EmptyPlayerState = React.memo(function EmptyPlayerState({
+  theme,
+}: {
+  theme: Theme;
+}) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -572,82 +550,115 @@ function EmptyPlayerState({ theme }: { theme: any }) {
   }, [pulseAnim]);
 
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingVertical: 60,
-        paddingHorizontal: 32,
-      }}
-    >
+    <View style={emptyStyles.container}>
       <Animated.View
-        style={{
-          transform: [{ scale: pulseAnim }],
-          marginBottom: 24,
-        }}
+        style={[emptyStyles.iconWrapper, { transform: [{ scale: pulseAnim }] }]}
       >
         <View
-          style={{
-            width: 100,
-            height: 100,
-            borderRadius: 50,
-            backgroundColor: theme.primary + "20",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
+          style={[
+            emptyStyles.iconCircle,
+            { backgroundColor: theme.primary + "20" },
+          ]}
         >
           <Ionicons name="musical-notes" size={48} color={theme.primary} />
         </View>
       </Animated.View>
-      <Text
-        style={{
-          fontSize: 24,
-          fontWeight: "700",
-          color: theme.text,
-          marginBottom: 12,
-          textAlign: "center",
-        }}
-      >
+      <Text style={[emptyStyles.title, { color: theme.text }]}>
         No Sounds Playing
       </Text>
-      <Text
-        style={{
-          fontSize: 16,
-          color: theme.textSecondary,
-          textAlign: "center",
-          lineHeight: 24,
-        }}
-      >
+      <Text style={[emptyStyles.subtitle, { color: theme.textSecondary }]}>
         Tap on any sound below to start your relaxing experience
       </Text>
     </View>
   );
-}
+});
 
-/* ================== NETWORK DETECTION ================== */
-/**
- * Check if device has internet connectivity
- * Returns false for airplane mode or no internet
- */
+const emptyStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  iconWrapper: { marginBottom: 24 },
+  iconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  subtitle: { fontSize: 16, textAlign: "center", lineHeight: 24 },
+});
+
+/* ================== CATEGORY TAB ================== */
+const CategoryTab = React.memo(function CategoryTab({
+  category,
+  isSelected,
+  theme,
+  customColor,
+  onPress,
+}: {
+  category: string;
+  isSelected: boolean;
+  theme: Theme;
+  customColor?: string;
+  onPress: () => void;
+}) {
+  const backgroundColor = isSelected
+    ? customColor || theme.primary
+    : theme.surface;
+
+  return (
+    <TouchableOpacity
+      style={[
+        categoryStyles.tab,
+        { backgroundColor, borderColor: theme.border },
+      ]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          categoryStyles.text,
+          {
+            color: isSelected ? "white" : theme.text,
+            fontWeight: isSelected ? "700" : "600",
+          },
+        ]}
+      >
+        {category}
+      </Text>
+    </TouchableOpacity>
+  );
+});
+
+const categoryStyles = StyleSheet.create({
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  text: { fontSize: 14, fontWeight: "600" },
+});
+
+/* ================== NETWORK & ANALYTICS ================== */
 const checkNetworkConnectivity = async (): Promise<boolean> => {
   try {
     const state = await Network.getNetworkStateAsync();
-    const isConnected =
-      state.isConnected === true && state.isInternetReachable === true;
-    console.log(`📡 Network status: ${isConnected ? "ONLINE" : "OFFLINE"}`);
-    return isConnected;
+    return state.isConnected === true && state.isInternetReachable === true;
   } catch {
-    console.log("📡 Network check failed, assuming offline");
     return false;
   }
 };
 
-/* ================== SAFE ANALYTICS WRAPPER ================== */
-/**
- * Wraps all analytics calls to gracefully handle offline/airplane mode
- * Prevents any network errors from blocking app functionality
- */
 const safeAnalytics = {
   trackSoundPlayed: (
     id: number,
@@ -657,103 +668,135 @@ const safeAnalytics = {
   ) => {
     try {
       Analytics.trackSoundPlayed(id, name, premium, mode);
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
   trackSoundPaused: () => {
     try {
       Analytics.trackSoundPaused();
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
   trackSoundResumed: () => {
     try {
       Analytics.trackSoundResumed();
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
   trackAllSoundsStopped: (count: number) => {
     try {
       Analytics.trackAllSoundsStopped(count);
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
   trackTimerSet: (minutes: number) => {
     try {
       Analytics.trackTimerSet(minutes);
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
   trackTimerCleared: () => {
     try {
       Analytics.trackTimerCleared();
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
   trackTimerCompleted: (minutes: number) => {
     try {
       Analytics.trackTimerCompleted(minutes);
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
-  trackPaywallViewed: (
-    source:
-      | "offline_limit"
-      | "mixer"
-      | "premium_sound"
-      | "banner"
-      | "settings"
-      | "favorite",
-  ) => {
+  trackPaywallViewed: (source: string) => {
     try {
-      Analytics.trackPaywallViewed(source);
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+      Analytics.trackPaywallViewed(source as any);
+    } catch {}
   },
   trackFavoriteAdded: (id: number, name: string, premium: boolean) => {
     try {
       Analytics.trackFavoriteAdded(id, name, premium);
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
   trackFavoriteRemoved: (id: number, name: string) => {
     try {
       Analytics.trackFavoriteRemoved(id, name);
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
   trackSoundDownloaded: (id: number, name: string) => {
     try {
       Analytics.trackSoundDownloaded(id, name);
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
   trackCategorySelected: (category: string, count: number) => {
     try {
       Analytics.trackCategorySelected(category, count);
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
   incrementUserProperty: (property: string, value: number) => {
     try {
       Analytics.incrementUserProperty(property, value);
-    } catch {
-      console.log("📊 Analytics unavailable (offline)");
-    }
+    } catch {}
   },
 };
+
+/* ================== ANIMATED CONTROL BUTTON ================== */
+const AnimatedControlButton = React.memo(function AnimatedControlButton({
+  onPress,
+  iconName,
+  style = {},
+  iconColor,
+  size = 24,
+  theme,
+}: {
+  onPress?: () => void;
+  iconName: string;
+  style?: any;
+  iconColor?: string;
+  size?: number;
+  theme: Theme;
+}) {
+  const buttonScale = useRef(new Animated.Value(1)).current;
+
+  const handlePress = useCallback(() => {
+    if (!onPress) return;
+    Animated.sequence([
+      Animated.timing(buttonScale, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    onPress();
+  }, [onPress, buttonScale]);
+
+  return (
+    <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+      <TouchableOpacity
+        style={[
+          controlStyles.button,
+          { backgroundColor: theme.primary },
+          style,
+        ]}
+        onPress={handlePress}
+        activeOpacity={0.8}
+        disabled={!onPress}
+      >
+        <Ionicons
+          name={iconName as any}
+          size={size}
+          color={iconColor || "white"}
+        />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
+
+const controlStyles = StyleSheet.create({
+  button: {
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 20,
+    elevation: 5,
+  },
+});
 
 /* ================== MAIN SCREEN ================== */
 export default function SoundsScreen() {
@@ -766,27 +809,27 @@ export default function SoundsScreen() {
     setStopMainSounds,
   } = useQuickPlay();
   const { setScrollViewRef } = useScroll();
-  const { setHasCompletedOnboarding } = useOnboarding();
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const { textSize, highContrastMode } = useAccessibility();
 
-  // Use high contrast theme if enabled
-  const theme = highContrastMode ? getHighContrastTheme(baseTheme) : baseTheme;
+  // Memoize theme to prevent unnecessary re-renders
+  const theme = useMemo(
+    () => (highContrastMode ? getHighContrastTheme(baseTheme) : baseTheme),
+    [highContrastMode, baseTheme],
+  ) as Theme;
 
-  // Helper function to apply text size multiplier
-  const getScaledFontSize = (baseSize: number): number => {
-    switch (textSize) {
-      case "small":
-        return Math.round(baseSize * 0.85);
-      case "large":
-        return Math.round(baseSize * 1.15);
-      default:
-        return baseSize;
-    }
-  };
+  // Memoize scaled font sizes
+  const scaledFontSizes = useMemo(() => {
+    const multiplier =
+      textSize === "small" ? 0.85 : textSize === "large" ? 1.15 : 1;
+    return {
+      name: Math.round(18 * multiplier),
+      description: Math.round(14 * multiplier),
+    };
+  }, [textSize]);
 
-  // Multiple sounds support
+  // State
   const [activeSounds, setActiveSounds] = useState<
     Map<
       number,
@@ -799,58 +842,121 @@ export default function SoundsScreen() {
       }
     >
   >(new Map());
-
   const [selectedCategory, setSelectedCategory] = useState<
     SoundCategory | "Favourites" | "Downloaded"
   >(SOUND_CATEGORIES.ALL);
-
   const [isPlaying, setIsPlaying] = useState(false);
   const [globalMuted, setGlobalMuted] = useState(false);
   const [loadingSounds, setLoadingSounds] = useState<Set<number>>(new Set());
   const [selectedSounds, setSelectedSounds] = useState<Set<number>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  // Timer state
   const [timerMinutes, setTimerMinutes] = useState<number | null>(null);
   const [timerSeconds, setTimerSeconds] = useState<number>(0);
   const [timerModalVisible, setTimerModalVisible] = useState(false);
   const [mixerModalVisible, setMixerModalVisible] = useState(false);
-  const timerIntervalRef = useRef<any>(null);
-
-  // RevenueCat - check if user has Pro access
-  const { isPro: pro, isLoading: revenueCatLoading } = useRevenueCat();
-  const { showNotification } = useNotification();
-
-  // Paywall state
   const [paywallOpen, setPaywallOpen] = useState(false);
-
-  // Favorites state
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
-
-  // Downloaded sounds state - local sounds (0: white noise, 1: rain, 2: ocean) are pre-downloaded
   const [downloadedSounds, setDownloadedSounds] = useState<Set<number>>(
     new Set([0, 1, 2]),
   );
-
-  // Downloading sounds state - track which sounds are currently being downloaded
   const [downloadingStates, setDownloadingStates] = useState<Set<number>>(
     new Set(),
   );
 
-  // Snackbar state for favorites and download feedback - supports multiple toasts
-  const [snackbars, setSnackbars] = useState<
-    {
-      id: number;
-      message: string;
-      opacity: Animated.Value;
-      translateY: Animated.Value;
-    }[]
-  >([]);
-  const snackbarIdCounter = useRef(0);
-
+  // Refs
+  const timerIntervalRef = useRef<any>(null);
   const playerSlide = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const activeSoundsRef = useRef(activeSounds);
 
+  // RevenueCat
+  const { isPro: pro, isLoading: revenueCatLoading } = useRevenueCat();
+  const { showNotification } = useNotification();
+
+  // Snackbar state
+  const [snackbars, setSnackbars] = useState<{ id: number; message: string }[]>(
+    [],
+  );
+  const snackbarIdCounter = useRef(0);
+  const snackbarAnimRefs = useRef<
+    Map<number, { opacity: Animated.Value; translateY: Animated.Value }>
+  >(new Map());
+
+  // ==================== MEMOIZED CALLBACKS ====================
+
+  // Modal handlers
+  const openTimerModal = useCallback(() => setTimerModalVisible(true), []);
+  const closeTimerModal = useCallback(() => setTimerModalVisible(false), []);
+  const closeMixerModal = useCallback(() => setMixerModalVisible(false), []);
+  const closePaywall = useCallback(() => setPaywallOpen(false), []);
+
+  const openMixerModal = useCallback(() => {
+    if (!pro) {
+      setPaywallOpen(true);
+    } else {
+      setMixerModalVisible(true);
+    }
+  }, [pro]);
+
+  const openPaywall = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setPaywallOpen(true);
+  }, []);
+
+  // Snackbar
+  const showSnackbar = useCallback((message: string) => {
+    const id = snackbarIdCounter.current++;
+    const opacity = new Animated.Value(0);
+    const translateY = new Animated.Value(0);
+
+    snackbarAnimRefs.current.set(id, { opacity, translateY });
+
+    setSnackbars((prev) => {
+      prev.forEach((snackbar, index) => {
+        const anim = snackbarAnimRefs.current.get(snackbar.id);
+        if (anim) {
+          Animated.timing(anim.translateY, {
+            toValue: (index + 1) * 70,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        }
+      });
+      return [...prev, { id, message }];
+    });
+
+    Animated.sequence([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.delay(2500),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setSnackbars((prev) => {
+        const filtered = prev.filter((s) => s.id !== id);
+        snackbarAnimRefs.current.delete(id);
+        filtered.forEach((snackbar, index) => {
+          const anim = snackbarAnimRefs.current.get(snackbar.id);
+          if (anim) {
+            Animated.timing(anim.translateY, {
+              toValue: index * 70,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+        });
+        return filtered;
+      });
+    });
+  }, []);
+
+  // Audio session configuration
   const configureAudioSession = useCallback(async () => {
     try {
       if (Audio?.setAudioModeAsync) {
@@ -869,79 +975,571 @@ export default function SoundsScreen() {
     }
   }, [backgroundPlayEnabled]);
 
-  // Configure audio session once at startup
-  useEffect(() => {
-    let mounted = true;
+  // Fade functions
+  const fadeInSound = useCallback(
+    async (sound: any, targetVolume: number, duration: number = 1500) => {
+      if (!sound) return;
+      const steps = 30;
+      const stepDuration = duration / steps;
+      let currentStep = 0;
 
-    const initAudio = async () => {
-      if (!mounted) return;
+      const fade = () => {
+        if (currentStep >= steps) {
+          sound.setVolumeAsync(targetVolume).catch(() => {});
+          return;
+        }
+        const progress = currentStep / steps;
+        sound.setVolumeAsync(targetVolume * progress).catch(() => {});
+        currentStep++;
+        setTimeout(fade, stepDuration);
+      };
+      fade();
+    },
+    [],
+  );
+
+  const fadeOutSound = useCallback(
+    async (sound: any, startVolume: number, duration: number = 1500) => {
+      if (!sound) return;
+      const steps = 30;
+      const stepDuration = duration / steps;
+      let currentStep = 0;
+
+      const fade = () => {
+        if (currentStep >= steps) {
+          sound.setVolumeAsync(0).catch(() => {});
+          return;
+        }
+        const progress = currentStep / steps;
+        sound.setVolumeAsync(startVolume * (1 - progress)).catch(() => {});
+        currentStep++;
+        setTimeout(fade, stepDuration);
+      };
+      fade();
+    },
+    [],
+  );
+
+  // Retry helper
+  const retryAudioOperation = useCallback(
+    async <T,>(
+      operation: () => Promise<T>,
+      operationName: string,
+      maxRetries: number = 3,
+      delayMs: number = 500,
+    ): Promise<T | null> => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          return await operation();
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (error) {
+          if (attempt < maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+          }
+        }
+      }
+      return null;
+    },
+    [],
+  );
+
+  // Cleanup sounds
+  const cleanupExistingSounds = useCallback(async (): Promise<void> => {
+    if (activeSounds.size === 0) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for (const [_id, data] of activeSounds.entries()) {
+      if (data?.sound) {
+        try {
+          data.sound.setOnPlaybackStatusUpdate(null);
+          await data.sound.stopAsync().catch(() => {});
+          await data.sound.unloadAsync().catch(() => {});
+        } catch {}
+      }
+    }
+
+    try {
+      await hidePlayingNotification();
+    } catch {}
+  }, [activeSounds]);
+
+  // Load new sound
+  const loadNewSound = useCallback(
+    async (soundItem: any) => {
+      let source: any;
+      try {
+        const sourcePromise = soundCache.getSource(soundItem, true, true);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout")), 5000),
+        );
+        source = await Promise.race([sourcePromise, timeoutPromise]);
+      } catch {
+        throw new Error(`Cannot load ${soundItem.name}`);
+      }
+
+      if (!soundCache.isDownloaded(soundItem.id)) {
+        soundCache.onDownloadComplete(
+          soundItem.id,
+          (completedId: number, success: boolean) => {
+            if (success) {
+              setDownloadedSounds((prev) => new Set(prev).add(completedId));
+              const sound = WHITE_NOISE_SOUNDS.find(
+                (s) => s.id === completedId,
+              );
+              if (sound) {
+                showSnackbar(`${sound.name} saved for offline`);
+                safeAnalytics.trackSoundDownloaded(completedId, sound.name);
+              }
+            }
+          },
+        );
+      }
+
+      if (soundCache.isDownloaded(soundItem.id)) {
+        setDownloadedSounds((prev) => new Set(prev).add(soundItem.id));
+      }
+
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        source,
+        {
+          isLooping: true,
+          volume: 0,
+          shouldPlay: false,
+          progressUpdateIntervalMillis: 1000,
+          androidImplementation: "MediaPlayer",
+        },
+        undefined,
+        false,
+      );
+
+      return {
+        sound: newSound,
+        soundItem,
+        volume: 0.5,
+        isMuted: globalMuted,
+        id: soundItem.id,
+      };
+    },
+    [globalMuted, showSnackbar],
+  );
+
+  // ==================== SOUND CARD HANDLERS (MEMOIZED) ====================
+
+  const handlePlaySound = useCallback(
+    async (soundItem: SoundItem) => {
+      if (soundItem.premium && !pro) {
+        safeAnalytics.trackPaywallViewed("premium_sound");
+        setPaywallOpen(true);
+        return;
+      }
+
+      safeAnalytics.trackSoundPlayed(
+        soundItem.id,
+        soundItem.name,
+        soundItem.premium,
+        "single",
+      );
+
+      if (
+        activeSounds.size === 1 &&
+        activeSounds.has(soundItem.id) &&
+        isPlaying
+      ) {
+        return;
+      }
+
+      setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
+      setTimerMinutes(null);
+      setTimerSeconds(0);
 
       try {
-        // Initialize sound cache for offline support
-        await soundCache.initialize();
+        const [, soundData] = await Promise.all([
+          cleanupExistingSounds(),
+          loadNewSound(soundItem),
+        ]);
 
-        // Load downloaded sounds into state
+        setLoadingSounds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(soundItem.id);
+          return newSet;
+        });
+
+        const playSuccess = await retryAudioOperation(
+          () => soundData.sound.playAsync(),
+          "Play",
+          3,
+          500,
+        );
+
+        if (!playSuccess) {
+          showSnackbar(`Failed to play ${soundItem.name}`);
+          return;
+        }
+
+        fadeInSound(
+          soundData.sound,
+          soundData.isMuted ? 0 : soundData.volume,
+          500,
+        );
+
+        const newActiveSounds = new Map();
+        newActiveSounds.set(soundItem.id, soundData);
+
+        setActiveSounds(newActiveSounds);
+        setIsPlaying(true);
+        setSelectedSounds(new Set());
+
+        showPlayingNotification(soundItem.name, false).catch(() => {});
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+        setLoadingSounds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(soundItem.id);
+          return newSet;
+        });
+        showNotification("Playback Error", "Could not play sound.", "error");
+      }
+    },
+    [
+      pro,
+      activeSounds,
+      isPlaying,
+      cleanupExistingSounds,
+      loadNewSound,
+      retryAudioOperation,
+      fadeInSound,
+      showSnackbar,
+      showNotification,
+    ],
+  );
+
+  const handleToggleFavorite = useCallback(
+    (soundId: number) => {
+      const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === soundId);
+      const isPremium = sound?.premium || false;
+
+      if (isPremium && !pro) {
+        safeAnalytics.trackPaywallViewed("favorite");
+        setPaywallOpen(true);
+        return;
+      }
+
+      setFavorites((prev) => {
+        const newFavorites = new Set(prev);
+        if (newFavorites.has(soundId)) {
+          newFavorites.delete(soundId);
+          safeAnalytics.trackFavoriteRemoved(soundId, sound?.name || "Unknown");
+        } else {
+          newFavorites.add(soundId);
+          safeAnalytics.trackFavoriteAdded(
+            soundId,
+            sound?.name || "Unknown",
+            isPremium,
+          );
+          safeAnalytics.incrementUserProperty("total_favorites_added", 1);
+        }
+
+        // Save to storage
+        Storage.setItem(
+          FAVORITES_KEY,
+          JSON.stringify(Array.from(newFavorites)),
+        );
+
+        return newFavorites;
+      });
+    },
+    [pro],
+  );
+
+  const handleDownloadSound = useCallback(
+    async (soundItem: SoundItem) => {
+      const isFreeDownloadable = !soundItem.premium;
+
+      if (!pro && !isFreeDownloadable) {
+        showSnackbar("Upgrade to Pro to save sounds for offline use");
+        safeAnalytics.trackPaywallViewed("offline_limit");
+        setPaywallOpen(true);
+        return;
+      }
+
+      if (soundItem.isLocal || downloadingStates.has(soundItem.id)) return;
+
+      const isOnline = await checkNetworkConnectivity();
+      if (!isOnline) {
+        showSnackbar("Cannot download in offline mode.");
+        return;
+      }
+
+      setDownloadingStates((prev) => new Set(prev).add(soundItem.id));
+
+      try {
+        const success = await soundCache.initiateDownload(soundItem, pro);
+        if (success) {
+          setDownloadedSounds((prev) => new Set(prev).add(soundItem.id));
+          showSnackbar(`${soundItem.name} saved for offline use!`);
+          safeAnalytics.trackSoundDownloaded(soundItem.id, soundItem.name);
+        } else {
+          if (!pro && !soundCache.canDownloadMore(pro)) {
+            showSnackbar(
+              "Free users can save 1 offline sound. Upgrade to Pro for unlimited.",
+            );
+            safeAnalytics.trackPaywallViewed("offline_limit");
+            setPaywallOpen(true);
+          } else {
+            showSnackbar(`Failed to download ${soundItem.name}`);
+          }
+        }
+      } catch {
+        showSnackbar(`Error downloading ${soundItem.name}`);
+      } finally {
+        setDownloadingStates((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(soundItem.id);
+          return newSet;
+        });
+      }
+    },
+    [pro, downloadingStates, showSnackbar],
+  );
+
+  // ==================== PLAYBACK CONTROLS ====================
+
+  const pauseAllSounds = useCallback(async () => {
+    for (const [, data] of activeSounds.entries()) {
+      if (data?.sound) {
+        await fadeOutSound(data.sound, data.volume, 1000);
+        await data.sound.pauseAsync().catch(() => {});
+      }
+    }
+    setIsPlaying(false);
+    safeAnalytics.trackSoundPaused();
+
+    const firstSound = Array.from(activeSounds.values())[0];
+    if (firstSound?.soundItem?.name) {
+      showPlayingNotification(firstSound.soundItem.name, true).catch(() => {});
+    }
+  }, [activeSounds, fadeOutSound]);
+
+  const resumeAllSounds = useCallback(async () => {
+    for (const [, data] of activeSounds.entries()) {
+      if (data?.sound) {
+        await data.sound.setVolumeAsync(0);
+        await retryAudioOperation(
+          () => data.sound.playAsync(),
+          "Resume",
+          3,
+          300,
+        );
+        fadeInSound(data.sound, data.volume, 1000);
+      }
+    }
+    setIsPlaying(true);
+    safeAnalytics.trackSoundResumed();
+
+    const firstSound = Array.from(activeSounds.values())[0];
+    if (firstSound?.soundItem?.name) {
+      showPlayingNotification(firstSound.soundItem.name, false).catch(() => {});
+    }
+  }, [activeSounds, retryAudioOperation, fadeInSound]);
+
+  const stopAllSounds = useCallback(async () => {
+    const soundCount = activeSounds.size;
+
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    for (const [, data] of activeSounds.entries()) {
+      if (data?.sound) {
+        try {
+          data.sound.setOnPlaybackStatusUpdate(null);
+          await data.sound.stopAsync().catch(() => {});
+          await data.sound.unloadAsync().catch(() => {});
+        } catch {}
+      }
+    }
+
+    setActiveSounds(new Map());
+    setIsPlaying(false);
+    setTimerMinutes(null);
+    setTimerSeconds(0);
+    setGlobalMuted(false);
+
+    if (soundCount > 0) {
+      safeAnalytics.trackAllSoundsStopped(soundCount);
+    }
+
+    hidePlayingNotification().catch(() => {});
+  }, [activeSounds]);
+
+  const toggleSoundInMixer = useCallback(
+    async (soundItem: any) => {
+      const newActiveSounds = new Map(activeSounds);
+
+      if (newActiveSounds.has(soundItem.id)) {
+        const data = newActiveSounds.get(soundItem.id);
+        if (data?.sound) {
+          data.sound.setOnPlaybackStatusUpdate(null);
+          await data.sound.stopAsync().catch(() => {});
+          await data.sound.unloadAsync().catch(() => {});
+        }
+        newActiveSounds.delete(soundItem.id);
+        setActiveSounds(newActiveSounds);
+      } else {
+        if (newActiveSounds.size >= 3) {
+          showSnackbar("Maximum 3 sounds can be mixed together");
+          return;
+        }
+
+        setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
+
+        try {
+          const soundData = await loadNewSound(soundItem);
+
+          setLoadingSounds((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(soundItem.id);
+            return newSet;
+          });
+
+          if (isPlaying) {
+            await retryAudioOperation(
+              () => soundData.sound.playAsync(),
+              "Mixer play",
+              3,
+              500,
+            );
+          }
+
+          newActiveSounds.set(soundItem.id, soundData);
+          setActiveSounds(newActiveSounds);
+        } catch {
+          setLoadingSounds((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(soundItem.id);
+            return newSet;
+          });
+          showNotification("Playback Error", "Could not load sound.", "error");
+        }
+      }
+
+      if (newActiveSounds.size > 0 && !isPlaying) {
+        setIsPlaying(true);
+      } else if (newActiveSounds.size === 0) {
+        setIsPlaying(false);
+      }
+    },
+    [
+      activeSounds,
+      isPlaying,
+      loadNewSound,
+      retryAudioOperation,
+      showSnackbar,
+      showNotification,
+    ],
+  );
+
+  const handleSetTimer = useCallback((minutes: number | null) => {
+    if (minutes === null) {
+      safeAnalytics.trackTimerCleared();
+    } else {
+      safeAnalytics.trackTimerSet(minutes);
+    }
+    setTimerMinutes(minutes);
+    setTimerSeconds(minutes ? minutes * 60 : 0);
+  }, []);
+
+  // Category selection
+  const handleSelectCategory = useCallback(
+    (category: SoundCategory | "Favourites" | "Downloaded") => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSelectedCategory(category);
+    },
+    [],
+  );
+
+  // Format time
+  const formatTime = useCallback((seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  }, []);
+
+  // ==================== EFFECTS ====================
+
+  // Initialize audio
+  useEffect(() => {
+    let mounted = true;
+    const initAudio = async () => {
+      if (!mounted) return;
+      try {
+        await soundCache.initialize();
         const downloadedIds = soundCache.getDownloadedSoundIds();
         setDownloadedSounds(new Set(downloadedIds));
-        console.log(`📦 Loaded ${downloadedIds.length} cached sounds`);
-
         await configureAudioSession();
         setupAudioNotifications();
-      } catch (error) {
-        console.error("Error initializing audio:", error);
-      }
+      } catch {}
     };
-
     initAudio();
-
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configureAudioSession]);
+
+  // Load favorites
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const stored = await Storage.getItem(FAVORITES_KEY);
+        if (stored) {
+          const ids = JSON.parse(stored);
+          if (Array.isArray(ids)) {
+            setFavorites(new Set(ids));
+          }
+        }
+      } catch {}
+      setTimeout(() => setIsInitialLoad(false), 800);
+    };
+    loadFavorites();
   }, []);
 
-  // Handle app state changes
-  useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
-      if (nextAppState === "background" || nextAppState === "inactive") {
-        if (backgroundPlayEnabled && activeSounds.size > 0 && isPlaying) {
-          // keep playing
-        } else if (
-          !backgroundPlayEnabled &&
-          activeSounds.size > 0 &&
-          isPlaying
-        ) {
-          pauseAllSounds();
-        }
-      } else if (nextAppState === "active") {
-        refreshSoundState();
-      }
-    };
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange,
-    );
-    return () => subscription?.remove();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backgroundPlayEnabled, activeSounds, isPlaying]);
+  // Reload favorites on focus
+  useFocusEffect(
+    useCallback(() => {
+      const loadFavorites = async () => {
+        try {
+          const stored = await Storage.getItem(FAVORITES_KEY);
+          if (stored) {
+            const ids = JSON.parse(stored);
+            if (Array.isArray(ids)) {
+              setFavorites(new Set(ids));
+            }
+          }
+        } catch {}
+      };
+      loadFavorites();
+    }, []),
+  );
 
-  // Timer logic
+  // Timer effect
   useEffect(() => {
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
     }
 
-    if (timerMinutes !== null && isPlaying && timerSeconds > 0) {
+    if (timerMinutes !== null && isPlaying) {
+      let remaining = timerMinutes * 60;
       timerIntervalRef.current = setInterval(() => {
-        setTimerSeconds((prev) => {
-          const newSeconds = prev - 1;
-          if (newSeconds <= 0) {
-            // Timer finished - schedule stop for next render cycle
-            safeAnalytics.trackTimerCompleted(timerMinutes);
-            return 0;
-          }
-          return newSeconds;
-        });
+        remaining--;
+        setTimerSeconds(remaining);
+        if (remaining <= 0) {
+          safeAnalytics.trackTimerCompleted(timerMinutes);
+        }
       }, 1000);
     }
 
@@ -950,71 +1548,33 @@ export default function SoundsScreen() {
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [timerMinutes, isPlaying, timerSeconds]);
+  }, [timerMinutes, isPlaying]);
 
-  // Handle timer completion
+  // Timer completion
   useEffect(() => {
     if (timerMinutes !== null && timerSeconds === 0 && isPlaying) {
-      // Timer completed - stop all sounds
-      const timeoutId = setTimeout(() => {
-        stopAllSounds();
-      }, 0);
-      return () => clearTimeout(timeoutId);
+      stopAllSounds();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timerSeconds, timerMinutes, isPlaying]);
+  }, [timerSeconds, timerMinutes, isPlaying, stopAllSounds]);
 
-  // Sync main playing state to context for quick play button
+  // Sync playing state
   useEffect(() => {
     setIsMainPlaying(isPlaying);
   }, [isPlaying, setIsMainPlaying]);
 
-  const updateNowPlayingInfo = async () => {
-    try {
-      if (!isWeb && activeSounds.size > 0) {
-        const soundNames = Array.from(activeSounds.values())
-          .map((data) => data.soundItem?.name || "Unknown")
-          .join(", ");
-        console.log("Now Playing:", soundNames);
-      }
-    } catch (error) {
-      console.error("Error updating now playing info:", error);
-    }
-  };
-
-  const refreshSoundState = useCallback(async () => {
-    let hasPlaying = false;
-
-    for (const [, data] of activeSounds.entries()) {
-      try {
-        const status = await data.sound.getStatusAsync();
-        if (status.isLoaded && status.isPlaying) {
-          hasPlaying = true;
-        }
-      } catch (error) {
-        console.error("Error refreshing sound state:", error);
-      }
-    }
-
-    setIsPlaying(hasPlaying);
-  }, [activeSounds]);
-
+  // Register stop callback
+  const stopAllSoundsRef = useRef(stopAllSounds);
   useEffect(() => {
+    stopAllSoundsRef.current = stopAllSounds;
+  }, [stopAllSounds]);
+  useEffect(() => {
+    setStopMainSounds(async () => await stopAllSoundsRef.current());
     return () => {
-      // Cleanup all sounds on unmount
-      activeSounds.forEach((data) => {
-        data.sound.unloadAsync();
-      });
+      setStopMainSounds(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setStopMainSounds]);
 
-  // Update lock screen info when active sounds change
-  useEffect(() => {
-    updateNowPlayingInfo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSounds, isPlaying]);
-
+  // Player slide animation
   useEffect(() => {
     if (activeSounds.size > 0 || selectedSounds.size > 0) {
       Animated.parallel([
@@ -1049,1010 +1609,48 @@ export default function SoundsScreen() {
     }
   }, [activeSounds.size, selectedSounds.size, playerSlide, overlayOpacity]);
 
-  // Clear selected sounds when active sounds change (when a new sound starts playing)
+  // Clear selected when active changes
   useEffect(() => {
     if (activeSounds.size > 0) {
       setSelectedSounds(new Set());
     }
   }, [activeSounds.size]);
 
-  // Load favorites from storage
+  // App state changes
+  const pauseAllSoundsRef = useRef(pauseAllSounds);
   useEffect(() => {
-    const loadFavorites = async () => {
-      try {
-        const stored = await Storage.getItem(FAVORITES_KEY);
-        if (stored) {
-          const ids = JSON.parse(stored);
-          if (Array.isArray(ids)) {
-            setFavorites(new Set(ids));
-          } else {
-            console.error("Invalid favorites format, resetting");
-            setFavorites(new Set());
-          }
-        }
-      } catch (error) {
-        console.error("Error loading favorites:", error);
-        setFavorites(new Set());
-      } finally {
-        setTimeout(() => setIsInitialLoad(false), 800);
+    pauseAllSoundsRef.current = pauseAllSounds;
+  }, [pauseAllSounds]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (
+        (nextAppState === "background" || nextAppState === "inactive") &&
+        !backgroundPlayEnabled &&
+        activeSoundsRef.current.size > 0
+      ) {
+        pauseAllSoundsRef.current();
       }
     };
-    loadFavorites();
-  }, []);
-
-  // Reload favorites when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      const loadFavorites = async () => {
-        try {
-          const stored = await Storage.getItem(FAVORITES_KEY);
-          if (stored) {
-            const ids = JSON.parse(stored);
-            if (Array.isArray(ids)) {
-              setFavorites(new Set(ids));
-            } else {
-              console.error("Invalid favorites format, resetting");
-              setFavorites(new Set());
-            }
-          } else {
-            setFavorites(new Set());
-          }
-        } catch (error) {
-          console.error("Error loading favorites:", error);
-          setFavorites(new Set());
-        }
-      };
-      loadFavorites();
-    }, []),
-  );
-
-  // Save favorites to storage whenever they change
-  const saveFavorites = async (newFavorites: Set<number>) => {
-    try {
-      const ids = Array.from(newFavorites);
-      await Storage.setItem(FAVORITES_KEY, JSON.stringify(ids));
-    } catch (error) {
-      console.error("Error saving favorites:", error);
-    }
-  };
-
-  // Toggle favorite
-  const toggleFavorite = (soundId: number) => {
-    const sound = WHITE_NOISE_SOUNDS.find((s) => s.id === soundId);
-    const isPremium = sound?.premium || false;
-
-    if (isPremium && !pro) {
-      safeAnalytics.trackPaywallViewed("favorite");
-      setPaywallOpen(true);
-      return;
-    }
-
-    const newFavorites = new Set(favorites);
-
-    if (newFavorites.has(soundId)) {
-      newFavorites.delete(soundId);
-      safeAnalytics.trackFavoriteRemoved(soundId, sound?.name || "Unknown");
-
-      if (selectedCategory === "Favourites" && newFavorites.size === 0) {
-        setSelectedCategory(SOUND_CATEGORIES.ALL);
-      }
-    } else {
-      newFavorites.add(soundId);
-      safeAnalytics.trackFavoriteAdded(
-        soundId,
-        sound?.name || "Unknown",
-        isPremium,
-      );
-      safeAnalytics.incrementUserProperty("total_favorites_added", 1);
-    }
-    setFavorites(newFavorites);
-    saveFavorites(newFavorites);
-  };
-
-  // Show snackbar animation with stacking support
-  const showSnackbar = useCallback((message: string) => {
-    const id = snackbarIdCounter.current++;
-    const opacity = new Animated.Value(0);
-    const translateY = new Animated.Value(0);
-
-    setSnackbars((prev) => {
-      prev.forEach((snackbar, index) => {
-        Animated.timing(snackbar.translateY, {
-          toValue: (index + 1) * 70,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-      });
-
-      return [...prev, { id, message, opacity, translateY }];
-    });
-
-    Animated.sequence([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.delay(2500),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setSnackbars((prev) => {
-        const filtered = prev.filter((s) => s.id !== id);
-        filtered.forEach((snackbar, index) => {
-          Animated.timing(snackbar.translateY, {
-            toValue: index * 70,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-        });
-        return filtered;
-      });
-    });
-  }, []);
-
-  // Retry helper function for audio operations
-  const retryAudioOperation = async <T,>(
-    operation: () => Promise<T>,
-    operationName: string,
-    maxRetries: number = 3,
-    delayMs: number = 500,
-  ): Promise<T | null> => {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(
-          `🔄 ${operationName} (attempt ${attempt}/${maxRetries})...`,
-        );
-        const result = await operation();
-        console.log(`✅ ${operationName} succeeded`);
-        return result;
-      } catch (error) {
-        console.error(
-          `❌ ${operationName} failed on attempt ${attempt}:`,
-          error,
-        );
-        if (attempt < maxRetries) {
-          console.log(
-            `⏳ Retrying in ${delayMs}ms... (${maxRetries - attempt} retries left)`,
-          );
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-        }
-      }
-    }
-    console.error(`❌ ${operationName} failed after ${maxRetries} attempts`);
-    return null;
-  };
-
-  // Toggle sound in mixer
-  const toggleSoundInMixer = async (soundItem: any) => {
-    const newActiveSounds = new Map(activeSounds);
-
-    if (newActiveSounds.has(soundItem.id)) {
-      // Sound is active - remove it
-      const data = newActiveSounds.get(soundItem.id);
-      if (data?.sound) {
-        try {
-          data.sound.setOnPlaybackStatusUpdate(null);
-          await data.sound.stopAsync();
-          await data.sound.unloadAsync();
-        } catch (error) {
-          console.error(`Error cleaning up sound ${soundItem.id}:`, error);
-        }
-      }
-      newActiveSounds.delete(soundItem.id);
-      setActiveSounds(newActiveSounds);
-    } else {
-      // 🆕 LIMIT: Max 3 sounds in mixer
-      if (newActiveSounds.size >= 3) {
-        showSnackbar("Maximum 3 sounds can be mixed together");
-        console.log("⚠️  Mixer limit reached: max 3 sounds");
-        return;
-      }
-
-      // Sound is not active - add it
-      try {
-        setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
-
-        const source = await soundCache.getSource(soundItem, true, true);
-
-        if (!soundCache.isDownloaded(soundItem.id)) {
-          soundCache.onDownloadComplete(
-            soundItem.id,
-            (completedId: number, success: boolean) => {
-              if (success) {
-                setDownloadedSounds((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.add(completedId);
-                  return newSet;
-                });
-                const sound = WHITE_NOISE_SOUNDS.find(
-                  (s) => s.id === completedId,
-                );
-                if (sound) {
-                  showSnackbar(`${sound.name} saved for offline`);
-                  safeAnalytics.trackSoundDownloaded(completedId, sound.name);
-                }
-              } else {
-                const sound = WHITE_NOISE_SOUNDS.find(
-                  (s) => s.id === completedId,
-                );
-                if (sound) {
-                  showSnackbar(`Failed to save ${sound.name} for offline`);
-                }
-              }
-            },
-          );
-        }
-
-        if (
-          soundCache.isDownloaded(soundItem.id) &&
-          !downloadedSounds.has(soundItem.id)
-        ) {
-          setDownloadedSounds((prev) => {
-            const newSet = new Set(prev);
-            newSet.add(soundItem.id);
-            return newSet;
-          });
-        }
-
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          source,
-          {
-            isLooping: true,
-            volume: globalMuted ? 0 : 0.5,
-            shouldPlay: false,
-            progressUpdateIntervalMillis: 1000,
-            androidImplementation: "MediaPlayer",
-          },
-          (status) => {
-            if (
-              status.isLoaded &&
-              status.durationMillis &&
-              status.durationMillis > 0
-            ) {
-              setLoadingSounds((prev) => {
-                const newSet = new Set(prev);
-                newSet.delete(soundItem.id);
-                return newSet;
-              });
-            }
-          },
-          false,
-        );
-
-        setLoadingSounds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(soundItem.id);
-          return newSet;
-        });
-
-        if (isPlaying) {
-          console.log(
-            `⏯️  Triggering playback for mixer sound ${soundItem.id}...`,
-          );
-          retryAudioOperation(
-            () => newSound.playAsync(),
-            `Playing mixer sound ${soundItem.id}`,
-            3,
-            500,
-          ).catch((err) => {
-            console.error(
-              `Error playing mixer sound ${soundItem.id} after retries:`,
-              err,
-            );
-            showSnackbar(`Failed to play ${soundItem.name}`);
-          });
-        }
-
-        newActiveSounds.set(soundItem.id, {
-          sound: newSound,
-          soundItem,
-          volume: 0.5,
-          isMuted: globalMuted,
-          id: soundItem.id,
-        });
-
-        setActiveSounds(newActiveSounds);
-      } catch (error) {
-        setLoadingSounds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(soundItem.id);
-          return newSet;
-        });
-
-        showNotification(
-          "Playback Error",
-          "Could not load sound. Please check your internet connection.",
-          "error",
-        );
-        console.error("Error playing sound:", error);
-        return;
-      }
-    }
-
-    // Update playing state
-    if (newActiveSounds.size > 0 && !isPlaying) {
-      setIsPlaying(true);
-    } else if (newActiveSounds.size === 0) {
-      setIsPlaying(false);
-    }
-  };
-
-  // Change volume for specific sound
-  const changeSoundVolume = async (soundId: number, volume: number) => {
-    const newActiveSounds = new Map(activeSounds);
-    const data = newActiveSounds.get(soundId);
-
-    if (data?.sound) {
-      try {
-        data.volume = volume;
-        if (!data.isMuted && !globalMuted) {
-          await data.sound.setVolumeAsync(volume);
-        }
-        setActiveSounds(newActiveSounds);
-      } catch (error) {
-        console.error(`Error changing volume for sound ${soundId}:`, error);
-      }
-    }
-  };
-
-  // Download sound for offline use
-  const handleDownloadSound = useCallback(
-    async (soundItem: any) => {
-      console.log(
-        `🎯 [handleDownloadSound] Clicked for sound ${soundItem.id} - ${soundItem.name}`,
-      );
-
-      const isFreeDownloadable = !soundItem.premium;
-
-      if (!pro && !isFreeDownloadable) {
-        console.log(
-          `🎯 [handleDownloadSound] Free user tried to download pro sound`,
-        );
-        showSnackbar("Upgrade to Pro to save sounds for offline use");
-        safeAnalytics.trackPaywallViewed("offline_limit");
-        setPaywallOpen(true);
-        return;
-      }
-
-      if (soundItem.isLocal) {
-        console.log(`🎯 [handleDownloadSound] Skipping - local sound`);
-        return;
-      }
-
-      if (downloadingStates.has(soundItem.id)) {
-        console.log(
-          `🎯 [handleDownloadSound] Already downloading, ignoring duplicate`,
-        );
-        return;
-      }
-
-      try {
-        // Check network connectivity first
-        const isOnline = await checkNetworkConnectivity();
-        if (!isOnline) {
-          showSnackbar(
-            "Cannot download in offline mode. Please check your internet connection.",
-          );
-          console.log(`🎯 [handleDownloadSound] Device is offline`);
-          return;
-        }
-
-        console.log(
-          `🎯 [handleDownloadSound] Setting downloading state for ${soundItem.id}`,
-        );
-        setDownloadingStates((prev) => new Set(prev).add(soundItem.id));
-
-        console.log(
-          `🎯 [handleDownloadSound] Calling soundCache.initiateDownload with pro=${pro}`,
-        );
-        const success = await soundCache.initiateDownload(soundItem, pro);
-        console.log(
-          `🎯 [handleDownloadSound] initiateDownload returned: ${success} for sound ${soundItem.id}`,
-        );
-
-        if (success) {
-          console.log(
-            `🎯 [handleDownloadSound] Marking ${soundItem.id} as downloaded`,
-          );
-          setDownloadedSounds((prev) => new Set(prev).add(soundItem.id));
-
-          showSnackbar(`${soundItem.name} saved for offline use!`);
-          safeAnalytics.trackSoundDownloaded(soundItem.id, soundItem.name);
-        } else {
-          console.log(
-            `🎯 [handleDownloadSound] Download failed for ${soundItem.id}`,
-          );
-          if (!pro && !soundCache.canDownloadMore(pro)) {
-            showSnackbar(
-              `Free users can save 1 offline sound. Upgrade to Pro for unlimited.`,
-            );
-            safeAnalytics.trackPaywallViewed("offline_limit");
-            setPaywallOpen(true);
-          } else {
-            showSnackbar(`Failed to download ${soundItem.name}`);
-          }
-        }
-      } catch (error) {
-        console.error(`🎯 [handleDownloadSound] Exception:`, error);
-        showSnackbar(`Error downloading ${soundItem.name}`);
-      } finally {
-        console.log(`🎯 [handleDownloadSound] Removing from downloading state`);
-        setDownloadingStates((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(soundItem.id);
-          return newSet;
-        });
-      }
-    },
-    [downloadingStates, pro, showSnackbar],
-  );
-
-  // Fade in sound over duration
-  const fadeInSound = useCallback(
-    async (sound: any, targetVolume: number, duration: number = 1500) => {
-      try {
-        if (!sound) {
-          console.warn("⚠️  fadeInSound: sound object is null/undefined");
-          return;
-        }
-
-        const startVolume = 0;
-        const startTime = Date.now();
-        const steps = 30;
-        const stepDuration = duration / steps;
-
-        const fadeStep = (elapsed: number) => {
-          if (elapsed >= duration) {
-            sound.setVolumeAsync(targetVolume).catch((err: any) => {
-              console.warn("⚠️  setVolumeAsync failed at end of fade:", err);
-            });
-            return;
-          }
-
-          const progress = elapsed / duration;
-          const currentVolume =
-            startVolume + (targetVolume - startVolume) * progress;
-          sound.setVolumeAsync(currentVolume).catch((err: any) => {
-            console.warn("⚠️  setVolumeAsync failed during fade:", err);
-          });
-
-          setTimeout(() => fadeStep(Date.now() - startTime), stepDuration);
-        };
-
-        fadeStep(0);
-      } catch (error) {
-        console.error("Error fading in sound:", error);
-        if (sound) {
-          sound.setVolumeAsync(targetVolume).catch((err: any) => {
-            console.warn("⚠️  Fallback setVolumeAsync failed:", err);
-          });
-        }
-      }
-    },
-    [],
-  );
-
-  // Fade out sound over duration
-  const fadeOutSound = useCallback(
-    async (sound: any, startVolume: number, duration: number = 1500) => {
-      try {
-        if (!sound) {
-          console.warn("⚠️  fadeOutSound: sound object is null/undefined");
-          return;
-        }
-
-        const startTime = Date.now();
-        const steps = 30;
-        const stepDuration = duration / steps;
-
-        const fadeStep = (elapsed: number) => {
-          if (elapsed >= duration) {
-            sound.setVolumeAsync(0).catch((err: any) => {
-              console.warn("⚠️  setVolumeAsync(0) failed at end of fade:", err);
-            });
-            return;
-          }
-
-          const progress = elapsed / duration;
-          const currentVolume = startVolume * (1 - progress);
-          sound.setVolumeAsync(currentVolume).catch((err: any) => {
-            console.warn("⚠️  setVolumeAsync failed during fade out:", err);
-          });
-
-          setTimeout(() => fadeStep(Date.now() - startTime), stepDuration);
-        };
-
-        fadeStep(0);
-      } catch (error) {
-        console.error("Error fading out sound:", error);
-        if (sound) {
-          sound.setVolumeAsync(0).catch((err: any) => {
-            console.warn("⚠️  Fallback setVolumeAsync(0) failed:", err);
-          });
-        }
-      }
-    },
-    [],
-  );
-
-  // Helper function to clean up existing sounds without resetting state
-  const cleanupExistingSounds = useCallback(async (): Promise<void> => {
-    if (activeSounds.size === 0) {
-      return;
-    }
-
-    const soundIds = Array.from(activeSounds.keys());
-    console.log(`🧹 Cleaning up ${soundIds.length} existing sound(s)...`);
-
-    const cleanupPromises: Promise<void>[] = [];
-
-    for (const [id, data] of activeSounds.entries()) {
-      if (data?.sound) {
-        const cleanupSound = async () => {
-          try {
-            console.log(
-              `  ⏹️  Cleaning up sound ${id} (${data.soundItem.name})...`,
-            );
-
-            // Clear playback status listener to prevent memory leaks
-            try {
-              data.sound.setOnPlaybackStatusUpdate(null);
-            } catch (listenerError) {
-              console.warn(
-                `⚠️  Could not clear listener for sound ${id}:`,
-                listenerError,
-              );
-            }
-
-            // Stop the sound
-            try {
-              await data.sound.stopAsync();
-            } catch (stopError) {
-              console.warn(`⚠️  Stop failed for sound ${id}:`, stopError);
-            }
-
-            // Unload the sound
-            try {
-              await data.sound.unloadAsync();
-            } catch (unloadError) {
-              console.warn(`⚠️  Unload failed for sound ${id}:`, unloadError);
-            }
-
-            console.log(`  ✅ Sound ${id} cleaned up`);
-          } catch (error) {
-            console.error(`Error cleaning up sound ${id}:`, error);
-          }
-        };
-
-        cleanupPromises.push(cleanupSound());
-      }
-    }
-
-    await Promise.all(cleanupPromises);
-
-    // Hide notification after cleanup
-    try {
-      await hidePlayingNotification();
-    } catch (notifError) {
-      console.log("📢 Notification dismiss skipped:", notifError);
-    }
-
-    console.log(`✅ All ${soundIds.length} sound(s) cleaned up`);
-  }, [activeSounds]);
-
-  // Helper function to load a new sound (returns sound object, doesn't play yet)
-  const loadNewSound = useCallback(
-    async (
-      soundItem: any,
-    ): Promise<{
-      sound: Audio.Sound;
-      soundItem: any;
-      volume: number;
-      isMuted: boolean;
-      id: number;
-    }> => {
-      console.log(`📦 Loading sound ${soundItem.id} (${soundItem.name})...`);
-
-      // Get source using sound cache - prioritize playback if not cached
-      // Add timeout to prevent hanging in offline mode
-      let source: any;
-      try {
-        const sourcePromise = soundCache.getSource(soundItem, true, true);
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Source load timeout")), 5000),
-        );
-        source = await Promise.race([sourcePromise, timeoutPromise]);
-      } catch (error) {
-        console.warn(
-          `⚠️ Failed to get sound source (likely offline): ${error}`,
-        );
-        // In offline mode, if no cached version available, can't play
-        throw new Error(
-          `Cannot load ${soundItem.name} - check your internet connection or download it for offline use`,
-        );
-      }
-
-      // Register callback for when download completes (background caching)
-      if (!soundCache.isDownloaded(soundItem.id)) {
-        soundCache.onDownloadComplete(
-          soundItem.id,
-          (completedId: number, success: boolean) => {
-            if (success) {
-              setDownloadedSounds((prev) => {
-                const newSet = new Set(prev);
-                newSet.add(completedId);
-                return newSet;
-              });
-              const sound = WHITE_NOISE_SOUNDS.find(
-                (s) => s.id === completedId,
-              );
-              if (sound) {
-                showSnackbar(`${sound.name} saved for offline`);
-                safeAnalytics.trackSoundDownloaded(completedId, sound.name);
-              }
-            } else {
-              const sound = WHITE_NOISE_SOUNDS.find(
-                (s) => s.id === completedId,
-              );
-              if (sound) {
-                showSnackbar(`Failed to save ${sound.name} for offline`);
-              }
-            }
-          },
-        );
-      }
-
-      // Update downloaded state if already cached
-      if (soundCache.isDownloaded(soundItem.id)) {
-        setDownloadedSounds((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(soundItem.id);
-          return newSet;
-        });
-      }
-
-      // Create sound with timeout protection
-      let newSound: Audio.Sound;
-      try {
-        const createPromise = Audio.Sound.createAsync(
-          source,
-          {
-            isLooping: true,
-            volume: 0, // Start at 0, we'll fade in after playback starts
-            shouldPlay: false,
-            progressUpdateIntervalMillis: 1000,
-            androidImplementation: "MediaPlayer",
-          },
-          undefined, // No status callback during load - we'll set it after
-          false, // Don't download entire file before playing
-        );
-        const timeoutPromise = new Promise<{ sound: Audio.Sound }>(
-          (_, reject) =>
-            setTimeout(() => reject(new Error("Sound creation timeout")), 8000),
-        );
-        const result = await Promise.race([createPromise, timeoutPromise]);
-        newSound = result.sound;
-      } catch (error) {
-        console.error(`❌ Failed to create sound object: ${error}`);
-        throw new Error(
-          `Could not load ${soundItem.name}. Check internet connection or download for offline.`,
-        );
-      }
-
-      console.log(`✅ Sound ${soundItem.id} (${soundItem.name}) loaded`);
-
-      return {
-        sound: newSound,
-        soundItem,
-        volume: 0.5,
-        isMuted: globalMuted,
-        id: soundItem.id,
-      };
-    },
-    [globalMuted, showSnackbar],
-  );
-
-  // Main function to play a single sound (with parallel cleanup + load)
-  const tryPlaySingle = async (soundItem: any) => {
-    // Check if sound is premium and user doesn't have pro
-    console.log(`Trying to play: ${soundItem.name}`);
-    console.log(`Is premium: ${soundItem.premium}`);
-    console.log(`User has pro: ${pro}`);
-
-    if (soundItem.premium && !pro) {
-      console.log("Opening paywall for premium sound");
-      safeAnalytics.trackPaywallViewed("premium_sound");
-      setPaywallOpen(true);
-      return;
-    }
-
-    console.log("Playing sound");
-
-    // Track sound played
-    safeAnalytics.trackSoundPlayed(
-      soundItem.id,
-      soundItem.name,
-      soundItem.premium,
-      "single",
+    const subscription = AppState.addEventListener(
+      "change",
+      handleAppStateChange,
     );
+    return () => subscription?.remove();
+  }, [backgroundPlayEnabled]);
 
-    // If this sound is already the only one playing, do nothing
-    if (
-      activeSounds.size === 1 &&
-      activeSounds.has(soundItem.id) &&
-      isPlaying
-    ) {
-      return;
-    }
-
-    // Show loading state immediately
-    setLoadingSounds((prev) => new Set(prev).add(soundItem.id));
-
-    console.log(`🎵 Switching to sound ${soundItem.id} (${soundItem.name})...`);
-
-    // Clear the timer when switching sounds
-    setTimerMinutes(null);
-    setTimerSeconds(0);
-
-    try {
-      // Run cleanup and loading in parallel for faster switching
-      const [, soundData] = await Promise.all([
-        cleanupExistingSounds(),
-        loadNewSound(soundItem),
-      ]);
-
-      // Clear loading state now that sound is loaded
-      setLoadingSounds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(soundItem.id);
-        return newSet;
-      });
-
-      // Start playback with retry
-      console.log(`⏯️  Starting playback for sound ${soundItem.id}...`);
-      const playSuccess = await retryAudioOperation(
-        () => soundData.sound.playAsync(),
-        `Playing sound ${soundItem.id}`,
-        3,
-        500,
-      );
-
-      if (!playSuccess) {
-        showSnackbar(`Failed to play ${soundItem.name} after 3 attempts`);
-        setLoadingSounds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(soundItem.id);
-          return newSet;
-        });
-        return;
-      }
-
-      // Fade in to target volume
-      fadeInSound(
-        soundData.sound,
-        soundData.isMuted ? 0 : soundData.volume,
-        500,
-      );
-
-      // ✅ Playback status tracking handled by usePlaybackStatusPolling hook
-      // Removed setOnPlaybackStatusUpdate callback - unreliable on Android SDK 51+
-      // The polling hook provides reliable cross-platform status updates
-
-      // Update state atomically
-      const newActiveSounds = new Map();
-      newActiveSounds.set(soundItem.id, soundData);
-
-      setActiveSounds(newActiveSounds);
-      setIsPlaying(true);
-      setSelectedSounds(new Set()); // Clear selection since now active
-
-      console.log(`✅ Sound ${soundItem.id} (${soundItem.name}) now playing!`);
-
-      // Show notification (non-blocking)
-      showPlayingNotification(soundItem.name, false).catch((notifError) => {
-        console.log("📢 Notification skipped:", notifError);
-      });
-    } catch (error) {
-      // Clear loading and selected state on error
-      setLoadingSounds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(soundItem.id);
-        return newSet;
-      });
-      setSelectedSounds(new Set());
-
-      showNotification(
-        "Playback Error",
-        "Could not play sound. Please try again later.",
-        "error",
-      );
-      console.error("Error playing sound:", error);
-    }
-  };
-
-  const pauseAllSounds = useCallback(async () => {
-    for (const [, data] of activeSounds.entries()) {
-      if (data?.sound) {
-        try {
-          await fadeOutSound(data.sound, data.volume, 1000);
-          await data.sound.pauseAsync();
-        } catch (error) {
-          console.error("Error pausing sound:", error);
-        }
-      }
-    }
-    setIsPlaying(false);
-
-    safeAnalytics.trackSoundPaused();
-
-    if (activeSounds.size > 0) {
-      const firstSound = Array.from(activeSounds.values())[0];
-      if (firstSound?.soundItem?.name) {
-        try {
-          await showPlayingNotification(firstSound.soundItem.name, true);
-        } catch (notifError) {
-          console.log("📢 Notification skipped:", notifError);
-        }
-      }
-    }
-  }, [activeSounds, fadeOutSound]);
-
-  const resumeAllSounds = useCallback(async () => {
-    try {
-      for (const [, data] of activeSounds.entries()) {
-        if (data?.sound) {
-          try {
-            await data.sound.setVolumeAsync(0);
-            await retryAudioOperation(
-              () => data.sound.playAsync(),
-              `Resuming sound ${data.soundItem?.id}`,
-              3,
-              300,
-            );
-            fadeInSound(data.sound, data.volume, 1000).catch((err) => {
-              console.error("Error during fade in:", err);
-            });
-          } catch (error) {
-            console.error("Error resuming sound:", error);
-          }
-        }
-      }
-      setIsPlaying(true);
-
-      safeAnalytics.trackSoundResumed();
-
-      if (activeSounds.size > 0) {
-        const firstSound = Array.from(activeSounds.values())[0];
-        if (firstSound?.soundItem?.name) {
-          try {
-            await showPlayingNotification(firstSound.soundItem.name, false);
-          } catch (notifError) {
-            console.log("📢 Notification skipped:", notifError);
-          }
-        }
-      }
-    } catch (error) {
-      showNotification(
-        "Playback Error",
-        "Could not resume sounds. Please try again.",
-        "error",
-      );
-      console.error("Error resuming sounds:", error);
-    }
-  }, [activeSounds, fadeInSound, showNotification]);
-
-  const stopAllSounds = useCallback(async () => {
-    try {
-      const soundCount = activeSounds.size;
-      if (soundCount > 0) {
-        const soundNames = Array.from(activeSounds.values())
-          .map((d) => `${d.soundItem.id} (${d.soundItem.name})`)
-          .join(", ");
-        console.log(`🛑 Stopping ${soundCount} sound(s): ${soundNames}...`);
-      }
-
-      // Clear timer first
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-
-      // Stop and unload all sounds with proper cleanup
-      for (const [id, data] of activeSounds.entries()) {
-        if (data?.sound) {
-          try {
-            console.log(
-              `  ⏹️  Stopping sound ${id} (${data.soundItem.name})...`,
-            );
-
-            try {
-              data.sound.setOnPlaybackStatusUpdate(null);
-            } catch (listenerError) {
-              console.warn(
-                `⚠️  Could not clear listener for sound ${id}:`,
-                listenerError,
-              );
-            }
-
-            try {
-              await data.sound.stopAsync();
-            } catch (stopError) {
-              console.warn(`⚠️  Stop failed for sound ${id}:`, stopError);
-            }
-
-            try {
-              await data.sound.unloadAsync();
-            } catch (unloadError) {
-              console.warn(`⚠️  Unload failed for sound ${id}:`, unloadError);
-            }
-
-            console.log(`  ✅ Sound ${id} cleaned up`);
-          } catch (error) {
-            console.error(`Error stopping sound ${id}:`, error);
-          }
-        }
-      }
-
-      // Reset all states
-      setActiveSounds(new Map());
-      setIsPlaying(false);
-      setTimerMinutes(null);
-      setTimerSeconds(0);
-      setGlobalMuted(false);
-      if (soundCount > 0) {
-        console.log(`✅ All ${soundCount} sound(s) stopped and states reset`);
-      }
-
-      if (soundCount > 0) {
-        safeAnalytics.trackAllSoundsStopped(soundCount);
-      }
-
-      try {
-        await hidePlayingNotification();
-      } catch (notifError) {
-        console.log("📢 Notification dismiss skipped:", notifError);
-      }
-    } catch (error) {
-      showNotification("Playback Error", "Could not stop sounds.", "error");
-      console.error("Error stopping sounds:", error);
-    }
-  }, [activeSounds, showNotification]);
-
-  // Register stopAllSounds callback with context - use ref to avoid re-renders
-  const stopAllSoundsRef = useRef(stopAllSounds);
-
-  useEffect(() => {
-    stopAllSoundsRef.current = stopAllSounds;
-  }, [stopAllSounds]);
-
-  useEffect(() => {
-    const wrappedStopAll = async () => await stopAllSoundsRef.current();
-    setStopMainSounds(wrappedStopAll);
-    return () => {
-      setStopMainSounds(null);
-    };
-  }, [setStopMainSounds]);
-
-  // Create refs for notification actions to avoid stale closures
+  // Notification listener
   const notificationPauseRef = useRef(pauseAllSounds);
   const notificationResumeRef = useRef(resumeAllSounds);
-
   useEffect(() => {
     notificationPauseRef.current = pauseAllSounds;
     notificationResumeRef.current = resumeAllSounds;
   }, [pauseAllSounds, resumeAllSounds]);
 
-  // Setup notification listener
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener(
       async (response) => {
         const action = response.actionIdentifier;
-        console.log("📢 Notification action:", action);
-
         switch (action) {
           case NOTIFICATION_ACTIONS.PAUSE:
             await notificationPauseRef.current();
@@ -2066,314 +1664,50 @@ export default function SoundsScreen() {
         }
       },
     );
-
     return () => {
       subscription.remove();
     };
   }, []);
 
-  const handleSetTimer = useCallback((minutes: number | null) => {
-    if (minutes === null) {
-      safeAnalytics.trackTimerCleared();
-    } else {
-      safeAnalytics.trackTimerSet(minutes);
-    }
-    setTimerMinutes(minutes);
-    setTimerSeconds(minutes ? minutes * 60 : 0);
+  // Update ref to track current activeSounds
+  useEffect(() => {
+    activeSoundsRef.current = activeSounds;
+  }, [activeSounds]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      activeSoundsRef.current.forEach((data) => {
+        data.sound.unloadAsync().catch(() => {});
+      });
+    };
   }, []);
 
-  const formatTime = useCallback((seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+  // ==================== MEMOIZED DATA ====================
 
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-        .toString()
-        .padStart(2, "0")}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, "0")}`;
-  }, []);
-
-  // Memoized SoundCard to prevent unnecessary re-renders
-  const SoundCard = React.memo(
-    ({ soundItem, index }: { soundItem: any; index: number }) => {
-      const isActive = activeSounds.has(soundItem.id);
-      const isQuickPlayActive =
-        isQuickPlaying && favoriteSoundId === String(soundItem.id);
-      const isLoading = loadingSounds.has(soundItem.id);
-      const isSelected = selectedSounds.has(soundItem.id);
-      const isDownloading = downloadingStates.has(soundItem.id);
-      const isDownloaded = downloadedSounds.has(soundItem.id);
-
-      const cardScale = useRef(new Animated.Value(1)).current;
-      const heartScale = useRef(new Animated.Value(1)).current;
-      const iconPulse = useRef(new Animated.Value(1)).current;
-
-      useEffect(() => {
-        if (isActive || isQuickPlayActive) {
-          Animated.loop(
-            Animated.sequence([
-              Animated.timing(iconPulse, {
-                toValue: 1.15,
-                duration: 800,
-                easing: Easing.inOut(Easing.ease),
-                useNativeDriver: true,
-              }),
-              Animated.timing(iconPulse, {
-                toValue: 1,
-                duration: 800,
-                easing: Easing.inOut(Easing.ease),
-                useNativeDriver: true,
-              }),
-            ]),
-          ).start();
-        } else {
-          iconPulse.stopAnimation();
-          Animated.timing(iconPulse, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }).start();
-        }
-      }, [isActive, isQuickPlayActive, iconPulse]);
-
-      const handlePress = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-        Animated.sequence([
-          Animated.timing(cardScale, {
-            toValue: 0.97,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-          Animated.spring(cardScale, {
-            toValue: 1,
-            friction: 3,
-            tension: 40,
-            useNativeDriver: true,
-          }),
-        ]).start();
-
-        tryPlaySingle(soundItem);
-      };
-
-      const handleHeartPress = (e: any) => {
-        e.stopPropagation();
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-        // Quick bounce animation
-        Animated.sequence([
-          Animated.timing(heartScale, {
-            toValue: 1.4,
-            duration: 150,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(heartScale, {
-            toValue: 0.95,
-            duration: 150,
-            easing: Easing.in(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.spring(heartScale, {
-            toValue: 1,
-            friction: 4,
-            tension: 40,
-            useNativeDriver: true,
-          }),
-        ]).start();
-
-        toggleFavorite(soundItem.id);
-      };
-
-      return (
-        <Animated.View
-          style={{
-            transform: [{ scale: cardScale }],
-          }}
-        >
-          <TouchableOpacity
-            style={[
-              styles.soundCard,
-              { backgroundColor: theme.surface, borderColor: theme.border },
-              (isActive || isQuickPlayActive) && {
-                borderColor: theme.primary,
-                backgroundColor: theme.card,
-                borderWidth: 2.5,
-              },
-            ]}
-            onPress={handlePress}
-            activeOpacity={0.8}
-            disabled={isLoading}
-          >
-            <Animated.View
-              style={[
-                styles.iconContainer,
-                {
-                  backgroundColor: soundItem.color,
-                  transform: [{ scale: iconPulse }],
-                },
-              ]}
-            >
-              {isLoading ? (
-                <View style={{ position: "relative" }}>
-                  <ActivityIndicator size="small" color="white" />
-                  <View
-                    style={{
-                      position: "absolute",
-                      bottom: -2,
-                      right: -2,
-                      backgroundColor: soundItem.color,
-                      borderRadius: 8,
-                      paddingHorizontal: 4,
-                      paddingVertical: 1,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 8,
-                        fontWeight: "600",
-                      }}
-                    >
-                      ...
-                    </Text>
-                  </View>
-                </View>
-              ) : (
-                <Ionicons
-                  name={soundItem.icon}
-                  size={24}
-                  color={themeMode === "light" ? "#2c2622" : "white"}
-                />
-              )}
-            </Animated.View>
-
-            <View style={styles.soundInfo}>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-              >
-                <Text
-                  style={[
-                    styles.soundName,
-                    { color: theme.text, fontSize: getScaledFontSize(18) },
-                  ]}
-                >
-                  {soundItem.name}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.soundDescription,
-                  {
-                    color: theme.textSecondary,
-                    fontSize: getScaledFontSize(14),
-                    opacity: 0.95,
-                  },
-                ]}
-              >
-                {soundItem.description}
-              </Text>
-            </View>
-
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              {!soundItem.isLocal &&
-                !isDownloaded &&
-                (pro || !soundItem.premium) && (
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      handleDownloadSound(soundItem);
-                    }}
-                    style={{
-                      padding: 8,
-                      position: "relative",
-                    }}
-                    disabled={isDownloading}
-                  >
-                    {isDownloading ? (
-                      <ActivityIndicator size="small" color={theme.primary} />
-                    ) : (
-                      <Ionicons
-                        name="cloud-download-outline"
-                        size={20}
-                        color={theme.primary}
-                      />
-                    )}
-                  </TouchableOpacity>
-                )}
-
-              {soundItem.premium && !pro ? (
-                <View
-                  style={{
-                    backgroundColor:
-                      themeMode === "light" ? "#9b8fa8" : "#8b5cf6",
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 6,
-                    marginRight: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "white",
-                      fontSize: 10,
-                      fontWeight: "700",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    PRO
-                  </Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  onPress={handleHeartPress}
-                  style={{
-                    padding: 8,
-                  }}
-                >
-                  <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-                    <Ionicons
-                      name={
-                        favorites?.has(soundItem.id) ? "heart" : "heart-outline"
-                      }
-                      size={22}
-                      color={
-                        favorites?.has(soundItem.id)
-                          ? "#FF6B6B"
-                          : theme.textSecondary
-                      }
-                    />
-                  </Animated.View>
-                </TouchableOpacity>
-              )}
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
-      );
-    },
-  );
-  SoundCard.displayName = "SoundCard";
-
-  // Memoize filtered sounds to prevent double filtering
-  const filteredSounds = React.useMemo(() => {
+  const filteredSounds = useMemo(() => {
     return WHITE_NOISE_SOUNDS.filter((sound) => {
-      if (selectedCategory === "Favourites") {
-        return favorites?.has(sound.id) || false;
-      }
-      if (selectedCategory === "Downloaded") {
+      if (selectedCategory === "Favourites") return favorites.has(sound.id);
+      if (selectedCategory === "Downloaded")
         return sound.isLocal || downloadedSounds.has(sound.id);
-      }
       return (
         selectedCategory === SOUND_CATEGORIES.ALL ||
         sound.category === selectedCategory
       );
     });
   }, [selectedCategory, favorites, downloadedSounds]);
+
+  const firstActiveSound = useMemo(() => {
+    return activeSounds.size > 0 ? Array.from(activeSounds.values())[0] : null;
+  }, [activeSounds]);
+
+  const additionalSounds = useMemo(() => {
+    return activeSounds.size > 1
+      ? Array.from(activeSounds.values()).slice(1)
+      : [];
+  }, [activeSounds]);
+
+  // ==================== RENDER ====================
 
   return (
     <View
@@ -2387,179 +1721,69 @@ export default function SoundsScreen() {
         backgroundColor={theme.background}
       />
 
-      {/* Show skeleton banner while RevenueCat is initializing (only for non-pro users) */}
-      {revenueCatLoading && !pro ? (
-        <View
-          style={{
-            marginTop: 12,
-            marginHorizontal: 16,
-          }}
-        >
+      {/* Loading banner */}
+      {revenueCatLoading && !pro && (
+        <View style={styles.bannerContainer}>
           <ShimmerLoader width="100%" height={60} borderRadius={12} />
         </View>
-      ) : null}
+      )}
 
-      {/* Pro Upgrade Banner */}
+      {/* Pro banner */}
       {!revenueCatLoading && !pro && (
         <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            backgroundColor: themeMode === "light" ? "#9b8fa8" : "#8b5cf6",
-            padding: 16,
-            borderRadius: 12,
-            marginTop: 12,
-            marginHorizontal: 16,
-          }}
+          style={[
+            styles.proBanner,
+            { backgroundColor: themeMode === "light" ? "#9b8fa8" : "#8b5cf6" },
+          ]}
         >
           <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-              setPaywallOpen(true);
-            }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              flex: 1,
-            }}
+            onPress={openPaywall}
+            style={styles.proBannerTouchable}
           >
             <Ionicons name="star" size={20} color="#fff" />
-            <Text
-              style={{
-                color: "#fff",
-                fontSize: 16,
-                fontWeight: "600",
-                marginLeft: 12,
-                flex: 1,
-              }}
-            >
+            <Text style={styles.proBannerText}>
               Upgrade to Pro - Unlock 44 Premium Sounds
             </Text>
           </TouchableOpacity>
         </View>
       )}
 
+      {/* Category tabs */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={[
-          styles.categoryTabs,
-          { paddingTop: 12, paddingBottom: 8, marginTop: 16 },
-        ]}
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          gap: 8,
-          alignItems: "center",
-        }}
+        style={styles.categoryTabs}
+        contentContainerStyle={styles.categoryTabsContent}
       >
-        {/* Show Favourites category first if there are any favorites */}
-        {favorites && favorites.size > 0 && (
-          <TouchableOpacity
-            key="Favourites"
-            style={[
-              styles.categoryTab,
-              {
-                backgroundColor:
-                  selectedCategory === "Favourites"
-                    ? theme.primary
-                    : theme.surface,
-                borderColor: theme.border,
-              },
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              safeAnalytics.trackCategorySelected("Favourites", favorites.size);
-              setSelectedCategory("Favourites");
-            }}
-          >
-            <Text
-              style={[
-                styles.categoryTabText,
-                {
-                  color:
-                    selectedCategory === "Favourites" ? "white" : theme.text,
-                  fontWeight: selectedCategory === "Favourites" ? "700" : "600",
-                },
-              ]}
-            >
-              Favourites
-            </Text>
-          </TouchableOpacity>
+        {favorites.size > 0 && (
+          <CategoryTab
+            category="Favourites"
+            isSelected={selectedCategory === "Favourites"}
+            theme={theme}
+            onPress={() => handleSelectCategory("Favourites")}
+          />
         )}
-
-        {/* Show Downloaded category if there are any downloaded sounds */}
-        {downloadedSounds && downloadedSounds.size > 0 && (
-          <TouchableOpacity
-            key="Downloaded"
-            style={[
-              styles.categoryTab,
-              {
-                backgroundColor:
-                  selectedCategory === "Downloaded" ? "#10b981" : theme.surface,
-                borderColor: theme.border,
-              },
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              safeAnalytics.trackCategorySelected(
-                "Downloaded",
-                downloadedSounds.size,
-              );
-              setSelectedCategory("Downloaded");
-            }}
-          >
-            <Text
-              style={[
-                styles.categoryTabText,
-                {
-                  color:
-                    selectedCategory === "Downloaded" ? "white" : theme.text,
-                  fontWeight: selectedCategory === "Downloaded" ? "700" : "600",
-                },
-              ]}
-            >
-              Offline
-            </Text>
-          </TouchableOpacity>
+        {downloadedSounds.size > 0 && (
+          <CategoryTab
+            category="Offline"
+            isSelected={selectedCategory === "Downloaded"}
+            theme={theme}
+            customColor="#10b981"
+            onPress={() => handleSelectCategory("Downloaded")}
+          />
         )}
         {Object.values(SOUND_CATEGORIES).map((category) => (
-          <TouchableOpacity
+          <CategoryTab
             key={category}
-            style={[
-              styles.categoryTab,
-              {
-                backgroundColor:
-                  selectedCategory === category ? theme.primary : theme.surface,
-                borderColor: theme.border,
-              },
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              safeAnalytics.trackCategorySelected(
-                category,
-                WHITE_NOISE_SOUNDS.filter(
-                  (s) =>
-                    selectedCategory === SOUND_CATEGORIES.ALL ||
-                    s.category === category,
-                ).length,
-              );
-              setSelectedCategory(category);
-            }}
-          >
-            <Text
-              style={[
-                styles.categoryTabText,
-                {
-                  color: selectedCategory === category ? "white" : theme.text,
-                  fontWeight: selectedCategory === category ? "700" : "600",
-                },
-              ]}
-            >
-              {category}
-            </Text>
-          </TouchableOpacity>
+            category={category}
+            isSelected={selectedCategory === category}
+            theme={theme}
+            onPress={() => handleSelectCategory(category)}
+          />
         ))}
       </ScrollView>
+
+      {/* Sound list */}
       <View style={styles.soundsList}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -2577,521 +1801,281 @@ export default function SoundsScreen() {
               <SoundCardSkeleton />
               <SoundCardSkeleton />
             </>
+          ) : filteredSounds.length === 0 ? (
+            <EmptyPlayerState theme={theme} />
           ) : (
-            <>
-              {filteredSounds.length === 0 ? (
-                <EmptyPlayerState theme={theme} />
-              ) : (
-                filteredSounds.map((soundItem, index) => (
-                  <SoundCard
-                    key={soundItem.id}
-                    soundItem={soundItem}
-                    index={index}
-                  />
-                ))
-              )}
-            </>
+            filteredSounds.map((soundItem) => (
+              <SoundCard
+                key={soundItem.id}
+                soundItem={soundItem as SoundItem}
+                isActive={activeSounds.has(soundItem.id)}
+                isLoading={loadingSounds.has(soundItem.id)}
+                isFavorite={favorites.has(soundItem.id)}
+                isDownloaded={downloadedSounds.has(soundItem.id)}
+                isDownloading={downloadingStates.has(soundItem.id)}
+                isQuickPlayActive={
+                  isQuickPlaying && favoriteSoundId === String(soundItem.id)
+                }
+                isPro={pro}
+                theme={theme}
+                themeMode={themeMode}
+                scaledNameSize={scaledFontSizes.name}
+                scaledDescSize={scaledFontSizes.description}
+                onPress={handlePlaySound}
+                onFavorite={handleToggleFavorite}
+                onDownload={handleDownloadSound}
+              />
+            ))
           )}
           <View style={{ height: 100 }} />
         </ScrollView>
       </View>
+
+      {/* Player controls */}
       {(activeSounds.size > 0 || selectedSounds.size > 0) && (
-        <>
-          <Animated.View
-            style={[
-              styles.playerControls,
-              {
-                backgroundColor: theme.background,
-                borderTopColor: theme.border,
-                transform: [{ translateY: playerSlide }],
-              },
-            ]}
-          >
-            {/* Timer display */}
-            {timerMinutes !== null && (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 4,
-                  marginBottom: 8,
-                }}
-              >
-                <Ionicons
-                  name="timer-outline"
-                  size={14}
-                  color={theme.primary}
-                />
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: theme.primary,
-                    fontWeight: "600",
-                  }}
+        <Animated.View
+          style={[
+            styles.playerControls,
+            {
+              backgroundColor: theme.background,
+              borderTopColor: theme.border,
+              transform: [{ translateY: playerSlide }],
+            },
+          ]}
+        >
+          {timerMinutes !== null && (
+            <View style={styles.timerDisplay}>
+              <Ionicons name="timer-outline" size={14} color={theme.primary} />
+              <Text style={[styles.timerText, { color: theme.primary }]}>
+                {formatTime(timerSeconds)}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.playerRow}>
+            {(activeSounds.size > 0 || selectedSounds.size > 0) && (
+              <View style={styles.soundInfoContainer}>
+                <View
+                  style={[
+                    styles.soundIconCircle,
+                    {
+                      backgroundColor:
+                        firstActiveSound?.soundItem?.color ||
+                        WHITE_NOISE_SOUNDS.find(
+                          (s) => s.id === Array.from(selectedSounds)[0],
+                        )?.color,
+                    },
+                  ]}
                 >
-                  {formatTime(timerSeconds)}
-                </Text>
+                  {activeSounds.size > 0 &&
+                  !loadingSounds.has(firstActiveSound?.soundItem?.id) ? (
+                    <Ionicons
+                      name={
+                        firstActiveSound?.soundItem?.icon || "musical-notes"
+                      }
+                      size={22}
+                      color="white"
+                    />
+                  ) : selectedSounds.size > 0 ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Ionicons name="musical-notes" size={22} color="white" />
+                  )}
+                </View>
+
+                <View style={styles.soundNameContainer}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.soundNameText, { color: theme.text }]}
+                  >
+                    {firstActiveSound?.soundItem?.name ||
+                      WHITE_NOISE_SOUNDS.find(
+                        (s) => s.id === Array.from(selectedSounds)[0],
+                      )?.name ||
+                      "No sound"}
+                  </Text>
+                  {additionalSounds.length > 0 && (
+                    <View style={styles.additionalSoundsRow}>
+                      {additionalSounds.map((data) => (
+                        <View
+                          key={data.soundItem.id}
+                          style={[
+                            styles.additionalSoundBadge,
+                            { backgroundColor: data.soundItem.color },
+                          ]}
+                        >
+                          <Ionicons
+                            name={data.soundItem.icon}
+                            size={12}
+                            color="white"
+                          />
+                          <Text
+                            style={styles.additionalSoundText}
+                            numberOfLines={1}
+                          >
+                            {data.soundItem.name}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  {activeSounds.size === 0 && selectedSounds.size > 0 && (
+                    <Text
+                      style={[styles.loadingText, { color: theme.primary }]}
+                    >
+                      Loading...
+                    </Text>
+                  )}
+                </View>
               </View>
             )}
 
-            {/* Sound info and controls layout */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-                justifyContent: "space-between",
-              }}
-            >
-              {/* Sound info on the left */}
-              {(activeSounds.size > 0 || selectedSounds.size > 0) && (
-                <View
-                  style={{
-                    flex: 1,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 12,
-                  }}
-                >
-                  {/* Colored circle with icon and loading spinner */}
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      backgroundColor:
-                        activeSounds.size > 0
-                          ? Array.from(activeSounds.values())[0]?.soundItem
-                              ?.color
-                          : WHITE_NOISE_SOUNDS.find(
-                              (s) => s.id === Array.from(selectedSounds)[0],
-                            )?.color,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      flexShrink: 0,
-                      position: "relative",
-                    }}
-                  >
-                    {activeSounds.size > 0 &&
-                    !loadingSounds.has(
-                      Array.from(activeSounds.values())[0]?.soundItem?.id,
-                    ) ? (
-                      <Ionicons
-                        name={
-                          Array.from(activeSounds.values())[0]?.soundItem
-                            ?.icon || "musical-notes"
-                        }
-                        size={22}
-                        color="white"
-                      />
-                    ) : selectedSounds.size > 0 ? (
-                      <ActivityIndicator
-                        size="small"
-                        color="white"
-                        style={{ position: "absolute" }}
-                      />
-                    ) : (
-                      <Ionicons name="musical-notes" size={22} color="white" />
-                    )}
-                  </View>
-
-                  {/* Sound name and count */}
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        fontSize: 16,
-                        fontWeight: "700",
-                        color: theme.text,
-                        marginBottom: 2,
-                      }}
-                    >
-                      {activeSounds.size > 0
-                        ? Array.from(activeSounds.values())[0]?.soundItem?.name
-                        : selectedSounds.size > 0
-                          ? WHITE_NOISE_SOUNDS.find(
-                              (s) => s.id === Array.from(selectedSounds)[0],
-                            )?.name
-                          : "No sound"}
-                    </Text>
-                    {activeSounds.size > 1 && (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 6,
-                          marginTop: 4,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        {Array.from(activeSounds.values())
-                          .slice(1)
-                          .map((data, idx) => (
-                            <View
-                              key={data.soundItem.id}
-                              style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                gap: 4,
-                                backgroundColor: data.soundItem.color,
-                                paddingHorizontal: 8,
-                                paddingVertical: 4,
-                                borderRadius: 6,
-                              }}
-                            >
-                              <Ionicons
-                                name={
-                                  data.soundItem.icon as React.ComponentProps<
-                                    typeof Ionicons
-                                  >["name"]
-                                }
-                                size={12}
-                                color="white"
-                              />
-                              <Text
-                                style={{
-                                  fontSize: 11,
-                                  color: "white",
-                                  fontWeight: "600",
-                                }}
-                                numberOfLines={1}
-                              >
-                                {data.soundItem.name}
-                              </Text>
-                            </View>
-                          ))}
-                      </View>
-                    )}
-                    {activeSounds.size === 0 && selectedSounds.size > 0 && (
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: theme.primary,
-                          fontWeight: "500",
-                        }}
-                      >
-                        Loading...
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              )}
-
-              {/* Control buttons on the right */}
-              <View
+            <View style={styles.controlsRow}>
+              <AnimatedControlButton
+                onPress={openMixerModal}
+                iconName="options"
+                size={20}
+                theme={theme}
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  flexShrink: 0,
+                  backgroundColor:
+                    activeSounds.size > 1 ? theme.primary : theme.card,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  width: 40,
+                  height: 40,
                 }}
-              >
-                <AnimatedControlButton
-                  onPress={() => {
-                    if (!pro) {
-                      setPaywallOpen(true);
-                    } else {
-                      setMixerModalVisible(true);
-                    }
-                  }}
-                  iconName="options"
-                  size={20}
-                  style={{
-                    backgroundColor:
-                      activeSounds.size > 1 ? theme.primary : theme.card,
-                    borderWidth: 1,
-                    borderColor: theme.border,
-                    width: 40,
-                    height: 40,
-                  }}
-                  iconColor={activeSounds.size > 1 ? "white" : theme.text}
-                />
-                <AnimatedControlButton
-                  onPress={() => setTimerModalVisible(true)}
-                  iconName="timer"
-                  size={20}
-                  style={{
-                    backgroundColor: timerMinutes ? theme.primary : theme.card,
-                    borderWidth: 1,
-                    borderColor: theme.border,
-                    width: 40,
-                    height: 40,
-                  }}
-                  iconColor={timerMinutes ? "white" : theme.text}
-                />
-                <AnimatedControlButton
-                  onPress={
+                iconColor={activeSounds.size > 1 ? "white" : theme.text}
+              />
+              <AnimatedControlButton
+                onPress={openTimerModal}
+                iconName="timer"
+                size={20}
+                theme={theme}
+                style={{
+                  backgroundColor: timerMinutes ? theme.primary : theme.card,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  width: 40,
+                  height: 40,
+                }}
+                iconColor={timerMinutes ? "white" : theme.text}
+              />
+              <AnimatedControlButton
+                onPress={
+                  selectedSounds.size > 0 && activeSounds.size === 0
+                    ? undefined
+                    : isPlaying
+                      ? pauseAllSounds
+                      : resumeAllSounds
+                }
+                iconName={
+                  selectedSounds.size > 0 && activeSounds.size === 0
+                    ? "hourglass"
+                    : isPlaying
+                      ? "pause"
+                      : "play"
+                }
+                size={20}
+                theme={theme}
+                style={{
+                  width: 40,
+                  height: 40,
+                  backgroundColor: theme.primary,
+                  opacity:
                     selectedSounds.size > 0 && activeSounds.size === 0
-                      ? undefined
-                      : isPlaying
-                        ? pauseAllSounds
-                        : resumeAllSounds
-                  }
-                  iconName={
-                    selectedSounds.size > 0 && activeSounds.size === 0
-                      ? "hourglass"
-                      : isPlaying
-                        ? "pause"
-                        : "play"
-                  }
-                  size={20}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    backgroundColor: theme.primary,
-                    opacity:
-                      selectedSounds.size > 0 && activeSounds.size === 0
-                        ? 0.6
-                        : 1,
-                  }}
-                  iconColor="white"
-                />
-                <AnimatedControlButton
-                  onPress={stopAllSounds}
-                  iconName="stop"
-                  size={20}
-                  style={{
-                    backgroundColor: theme.error,
-                    width: 40,
-                    height: 40,
-                  }}
-                  iconColor="white"
-                />
-              </View>
+                      ? 0.6
+                      : 1,
+                }}
+                iconColor="white"
+              />
+              <AnimatedControlButton
+                onPress={stopAllSounds}
+                iconName="stop"
+                size={20}
+                theme={theme}
+                style={{ backgroundColor: theme.error, width: 40, height: 40 }}
+                iconColor="white"
+              />
             </View>
-          </Animated.View>
-        </>
+          </View>
+        </Animated.View>
       )}
-      {/* Mixer Modal */}
+
+      {/* Modals */}
       <MixerModal
         visible={mixerModalVisible}
-        onClose={() => {
-          setMixerModalVisible(false);
-        }}
+        onClose={closeMixerModal}
         theme={theme}
         themeMode={themeMode}
         activeSounds={activeSounds}
         onToggleSound={toggleSoundInMixer}
-        onVolumeChange={changeSoundVolume}
         favorites={favorites}
-        onToggleFavorite={toggleFavorite}
+        onToggleFavorite={handleToggleFavorite}
         pro={pro}
         isPlaying={isPlaying}
       />
-      {/* Timer Modal */}
       <TimerModal
         visible={timerModalVisible}
-        onClose={() => {
-          setTimerModalVisible(false);
-        }}
+        onClose={closeTimerModal}
         onSetTimer={handleSetTimer}
         theme={theme}
         currentTimer={timerMinutes}
       />
+      <PaywallModal visible={paywallOpen} onClose={closePaywall} />
 
-      {/* Snackbar for favorites feedback */}
-      {snackbars.map((snackbar, index) => (
-        <Animated.View
-          key={snackbar.id}
-          style={{
-            position: "absolute",
-            top: 120,
-            left: 20,
-            right: 20,
-            backgroundColor: theme.primary,
-            padding: 16,
-            borderRadius: 12,
-            opacity: snackbar.opacity,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.25,
-            shadowRadius: 8,
-            elevation: 8,
-            zIndex: 9999 - index,
-            transform: [{ translateY: snackbar.translateY }],
-          }}
-        >
-          <Text
-            style={{
-              color: "#ffffff",
-              fontSize: 15,
-              fontWeight: "700",
-              textAlign: "center",
-              letterSpacing: 0.3,
-            }}
+      {/* Snackbars */}
+      {snackbars.map((snackbar, index) => {
+        const anim = snackbarAnimRefs.current.get(snackbar.id);
+        return (
+          <Animated.View
+            key={snackbar.id}
+            style={[
+              styles.snackbar,
+              {
+                backgroundColor: theme.primary,
+                opacity: anim?.opacity,
+                zIndex: 9999 - index,
+                transform: [
+                  { translateY: anim?.translateY || new Animated.Value(0) },
+                ],
+              },
+            ]}
           >
-            {snackbar.message}
-          </Text>
-        </Animated.View>
-      ))}
-
-      {/* Volume Warning Banner */}
-
-      {/* Paywall Modal */}
-      <PaywallModal
-        visible={paywallOpen}
-        onClose={() => setPaywallOpen(false)}
-      />
+            <Text style={styles.snackbarText}>{snackbar.message}</Text>
+          </Animated.View>
+        );
+      })}
     </View>
-  );
-}
-
-function AnimatedControlButton({
-  onPress,
-  iconName,
-  style = {},
-  iconColor,
-  size = 24,
-}: any) {
-  const { theme } = useTheme();
-  const buttonScale = useRef(new Animated.Value(1)).current;
-
-  const handlePress = () => {
-    if (!onPress) return;
-    Animated.sequence([
-      Animated.timing(buttonScale, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonScale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    onPress();
-  };
-
-  return (
-    <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-      <TouchableOpacity
-        style={[
-          styles.controlButton,
-          { backgroundColor: theme.primary },
-          style,
-        ]}
-        onPress={handlePress}
-        activeOpacity={0.8}
-        disabled={!onPress}
-      >
-        <Ionicons name={iconName} size={size} color={iconColor || "white"} />
-      </TouchableOpacity>
-    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  bannerContainer: { marginTop: 12, marginHorizontal: 16 },
   proBanner: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    borderRadius: 10,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  proBannerContent: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
-    gap: 10,
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 12,
+    marginHorizontal: 16,
   },
-  proBannerIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  proBannerTouchable: { flexDirection: "row", alignItems: "center", flex: 1 },
   proBannerText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 12,
     flex: 1,
   },
-  proBannerTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "white",
-    marginBottom: 2,
-  },
-  proBannerSubtitle: {
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.9)",
-    fontWeight: "500",
-  },
-  header: {
-    padding: 10,
-    alignItems: "center",
-    height: 65,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
   categoryTabs: {
-    paddingBottom: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
+    marginTop: 16,
     maxHeight: 60,
   },
-  image: {
-    width: 300,
-    height: 75,
-  },
-  categoryTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  categoryTabText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  backgroundPlayIndicator: {
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-  },
+  categoryTabsContent: { paddingHorizontal: 16, gap: 8, alignItems: "center" },
   soundsList: { flex: 1, padding: 10 },
-  soundCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
-  },
-  soundInfo: { flex: 1 },
-  soundName: { fontSize: 18, fontWeight: "600", marginBottom: 4 },
-  soundDescription: { fontSize: 14 },
-  playingIndicator: { padding: 8 },
-  overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
-  },
-  overlayTouchable: { flex: 1 },
   playerControls: {
     position: "absolute",
     bottom: 0,
@@ -3103,69 +2087,77 @@ const styles = StyleSheet.create({
     elevation: 8,
     zIndex: 2,
   },
-  playerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  closeButton: {
-    padding: 6,
-    borderRadius: 12,
-  },
-  nowPlaying: { alignItems: "center", marginBottom: 16 },
-  nowPlayingText: {
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  currentSoundName: { fontSize: 18, fontWeight: "600", marginTop: 4 },
-  backgroundPlayText: { fontSize: 11, marginTop: 4, fontWeight: "500" },
-  controlsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-  },
-  controlButton: {
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 20,
-    elevation: 5,
-  },
-  volumeControl: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-  },
-  volumeSlider: { flex: 1, marginHorizontal: 12 },
-  volumeTrack: { height: 4, borderRadius: 2, position: "relative" },
-  volumeThumb: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    position: "absolute",
-    top: -6,
-    marginLeft: -8,
-    elevation: 4,
-  },
   timerDisplay: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: "rgba(100, 100, 255, 0.1)",
+    justifyContent: "center",
+    gap: 4,
+    marginBottom: 8,
   },
-  timerText: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginLeft: 6,
+  timerText: { fontSize: 13, fontWeight: "600" },
+  playerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    justifyContent: "space-between",
   },
-  playingText: {
-    fontSize: 12,
-    fontWeight: "bold",
+  soundInfoContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  soundIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  soundNameContainer: { flex: 1, minWidth: 0 },
+  soundNameText: { fontSize: 16, fontWeight: "700", marginBottom: 2 },
+  additionalSoundsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     marginTop: 4,
+    flexWrap: "wrap",
+  },
+  additionalSoundBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  additionalSoundText: { fontSize: 11, color: "white", fontWeight: "600" },
+  loadingText: { fontSize: 12, fontWeight: "500" },
+  controlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 0,
+  },
+  snackbar: {
+    position: "absolute",
+    top: 120,
+    left: 20,
+    right: 20,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  snackbarText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: 0.3,
   },
 });
