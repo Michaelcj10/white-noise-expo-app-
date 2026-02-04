@@ -17,6 +17,7 @@
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/elements": "^2.3.8",
     "@react-navigation/native": "^7.1.6",
+    "@shopify/flash-list": "^2.2.2",
     "dotenv": "^17.2.3",
     "expo": "54.0.19",
     "expo-av": "~16.0.7",

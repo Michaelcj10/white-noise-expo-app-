@@ -9,11 +9,11 @@ import { useAccessibility } from "@/contexts/accessibility";
 import { useNotification } from "@/contexts/notification";
 import { useQuickPlay } from "@/contexts/quickplay";
 import { useRevenueCat } from "@/contexts/revenuecat";
-import { useScroll } from "@/contexts/scroll";
 import { Analytics } from "@/utils/analytics";
 import { soundCache } from "@/utils/soundCache";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { FlashList } from "@shopify/flash-list";
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import * as Haptics from "expo-haptics";
 import * as Network from "expo-network";
@@ -808,8 +808,7 @@ export default function SoundsScreen() {
     setIsMainPlaying,
     setStopMainSounds,
   } = useQuickPlay();
-  const { setScrollViewRef } = useScroll();
-  const scrollViewRef = useRef<ScrollView>(null);
+
   const insets = useSafeAreaInsets();
   const { textSize, highContrastMode } = useAccessibility();
 
@@ -1785,28 +1784,25 @@ export default function SoundsScreen() {
 
       {/* Sound list */}
       <View style={styles.soundsList}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          ref={(ref) => {
-            scrollViewRef.current = ref;
-            setScrollViewRef("index", ref);
-          }}
-        >
-          {isInitialLoad ? (
-            <>
-              <SoundCardSkeleton />
-              <SoundCardSkeleton />
-              <SoundCardSkeleton />
-              <SoundCardSkeleton />
-              <SoundCardSkeleton />
-              <SoundCardSkeleton />
-            </>
-          ) : filteredSounds.length === 0 ? (
+        {isInitialLoad ? (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <SoundCardSkeleton />
+            <SoundCardSkeleton />
+            <SoundCardSkeleton />
+            <SoundCardSkeleton />
+            <SoundCardSkeleton />
+            <SoundCardSkeleton />
+            <View style={{ height: 100 }} />
+          </ScrollView>
+        ) : filteredSounds.length === 0 ? (
+          <ScrollView showsVerticalScrollIndicator={false}>
             <EmptyPlayerState theme={theme} />
-          ) : (
-            filteredSounds.map((soundItem) => (
+          </ScrollView>
+        ) : (
+          <FlashList
+            data={filteredSounds}
+            renderItem={({ item: soundItem }) => (
               <SoundCard
-                key={soundItem.id}
                 soundItem={soundItem as SoundItem}
                 isActive={activeSounds.has(soundItem.id)}
                 isLoading={loadingSounds.has(soundItem.id)}
@@ -1825,10 +1821,12 @@ export default function SoundsScreen() {
                 onFavorite={handleToggleFavorite}
                 onDownload={handleDownloadSound}
               />
-            ))
-          )}
-          <View style={{ height: 100 }} />
-        </ScrollView>
+            )}
+            keyExtractor={(item) => String(item.id)}
+            showsVerticalScrollIndicator={false}
+            ListFooterComponent={<View style={{ height: 100 }} />}
+          />
+        )}
       </View>
 
       {/* Player controls */}

@@ -10,6 +10,7 @@ import { themes, useTheme } from "@/contexts/themecontext";
 import { useToast } from "@/contexts/toast";
 
 import { Analytics } from "@/utils/analytics";
+import { soundCache } from "@/utils/soundCache";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
@@ -100,6 +101,9 @@ export default function SettingsScreen() {
   } | null>(null);
   const [confirmClearFavoritesVisible, setConfirmClearFavoritesVisible] =
     useState(false);
+  const [confirmClearCacheVisible, setConfirmClearCacheVisible] =
+    useState(false);
+  const [offlineSoundsCount, setOfflineSoundsCount] = useState(0);
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [isRestoringPurchases, setIsRestoringPurchases] = useState(false);
   const [accessibilityModalVisible, setAccessibilityModalVisible] =
@@ -114,7 +118,26 @@ export default function SettingsScreen() {
   const theme = highContrastMode ? getHighContrastTheme(baseTheme) : baseTheme;
 
   // Helper function to apply text size multiplier
-  const getScaledFontSize = (baseSize: number): number => {
+  const handleClearOfflineSounds = async () => {
+    try {
+      await soundCache.clearCache();
+      setOfflineSoundsCount(0);
+      setConfirmClearCacheVisible(false);
+      setInfoModalContent({
+        title: "Cache Cleared",
+        message: "All offline sounds have been removed. Your device storage has been freed up.",
+        icon: "checkmark-circle",
+      });
+      setInfoModalVisible(true);
+      showToast("Offline sounds cleared", "success");
+    } catch (error) {
+      showNotification(
+        "Error",
+        "Failed to clear offline sounds. Please try again.",
+        "error",
+      );
+    }
+  }; = (baseSize: number): number => {
     switch (textSize) {
       case "small":
         return Math.round(baseSize * 0.85);
@@ -178,6 +201,14 @@ export default function SettingsScreen() {
           setFavoritesCount(0);
         }
       })();
+    }, []),
+  );
+
+  // Load offline sounds count when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const count = soundCache.getDownloadedSoundIds().length;
+      setOfflineSoundsCount(count);
     }, []),
   );
 
@@ -657,6 +688,18 @@ export default function SettingsScreen() {
           }}
           color={autoCheckUpdates ? theme.primary : theme.surface}
         />
+
+        <SectionHeader title="Data & Storage" />
+        {offlineSoundsCount > 0 && (
+          <SettingItem
+            icon="trash"
+            title="Clear Offline Sounds"
+            description={`${offlineSoundsCount} sound${offlineSoundsCount !== 1 ? "s" : ""} saved • Free up space`}
+            onPress={() => setConfirmClearCacheVisible(true)}
+            showArrow={false}
+            color={theme.error}
+          />
+        )}
 
         <SectionHeader title="Support" />
         <SettingItem
@@ -1712,6 +1755,131 @@ export default function SettingsScreen() {
 
               <TouchableOpacity
                 onPress={() => setConfirmClearFavoritesVisible(false)}
+                style={{
+                  backgroundColor: theme.primary,
+                  paddingVertical: 12,
+                  paddingHorizontal: 24,
+                  borderRadius: 24,
+                  alignItems: "center",
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <Ionicons name="close" size={20} color="white" />
+                <Text
+                  style={{
+                    color: "white",
+                    fontSize: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Clear Cache Modal */}
+      <Modal
+        visible={confirmClearCacheVisible}
+        animationType="fade"
+        transparent
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              maxWidth: 400,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            <View
+              style={{
+                alignItems: "center",
+                marginBottom: 20,
+              }}
+            >
+              <View
+                style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 30,
+                  backgroundColor: theme.error + "20",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: 16,
+                }}
+              >
+                <Ionicons name="trash" size={32} color={theme.error} />
+              </View>
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: "700",
+                  color: theme.text,
+                  marginBottom: 8,
+                }}
+              >
+                Clear Offline Sounds?
+              </Text>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: theme.textSecondary,
+                  textAlign: "center",
+                  lineHeight: 22,
+                }}
+              >
+                This will delete {offlineSoundsCount} saved sound{offlineSoundsCount !== 1 ? "s" : ""} and free up device storage. You can re-download them later.
+              </Text>
+            </View>
+
+            <View style={{ gap: 12 }}>
+              <TouchableOpacity
+                onPress={handleClearOfflineSounds}
+                style={{
+                  backgroundColor: theme.error,
+                  paddingVertical: 12,
+                  paddingHorizontal: 24,
+                  borderRadius: 24,
+                  alignItems: "center",
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <Ionicons name="trash" size={20} color="white" />
+                <Text
+                  style={{
+                    color: "white",
+                    fontSize: 16,
+                    fontWeight: "600",
+                  }}
+                >
+                  Clear All
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setConfirmClearCacheVisible(false)}
                 style={{
                   backgroundColor: theme.primary,
                   paddingVertical: 12,
