@@ -39,6 +39,7 @@ import {
   Switch,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -810,6 +811,8 @@ export default function SoundsScreen() {
   } = useQuickPlay();
 
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const isTablet = screenWidth >= 768;
   const { textSize, highContrastMode } = useAccessibility();
 
   // Memoize theme to prevent unnecessary re-renders
@@ -1844,12 +1847,43 @@ export default function SoundsScreen() {
       <View style={styles.soundsList}>
         {isInitialLoad ? (
           <ScrollView showsVerticalScrollIndicator={false}>
-            <SoundCardSkeleton />
-            <SoundCardSkeleton />
-            <SoundCardSkeleton />
-            <SoundCardSkeleton />
-            <SoundCardSkeleton />
-            <SoundCardSkeleton />
+            {isTablet ? (
+              <>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <SoundCardSkeleton />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <SoundCardSkeleton />
+                  </View>
+                </View>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <SoundCardSkeleton />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <SoundCardSkeleton />
+                  </View>
+                </View>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <SoundCardSkeleton />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <SoundCardSkeleton />
+                  </View>
+                </View>
+              </>
+            ) : (
+              <>
+                <SoundCardSkeleton />
+                <SoundCardSkeleton />
+                <SoundCardSkeleton />
+                <SoundCardSkeleton />
+                <SoundCardSkeleton />
+                <SoundCardSkeleton />
+              </>
+            )}
             <View style={{ height: 100 }} />
           </ScrollView>
         ) : filteredSounds.length === 0 ? (
@@ -1859,26 +1893,40 @@ export default function SoundsScreen() {
         ) : (
           <FlashList
             data={filteredSounds}
-            renderItem={({ item: soundItem }) => (
-              <SoundCard
-                soundItem={soundItem as SoundItem}
-                isActive={activeSounds.has(soundItem.id)}
-                isLoading={loadingSounds.has(soundItem.id)}
-                isFavorite={favorites.has(soundItem.id)}
-                isDownloaded={downloadedSounds.has(soundItem.id)}
-                isDownloading={downloadingStates.has(soundItem.id)}
-                isQuickPlayActive={
-                  isQuickPlaying && favoriteSoundId === String(soundItem.id)
+            numColumns={isTablet ? 2 : 1}
+            key={isTablet ? "tablet-2col" : "mobile-1col"}
+            renderItem={({ item: soundItem, index }) => (
+              <View
+                style={
+                  isTablet
+                    ? {
+                        flex: 1,
+                        marginLeft: index % 2 === 1 ? 6 : 0,
+                        marginRight: index % 2 === 0 ? 6 : 0,
+                      }
+                    : undefined
                 }
-                isPro={pro}
-                theme={theme}
-                themeMode={themeMode}
-                scaledNameSize={scaledFontSizes.name}
-                scaledDescSize={scaledFontSizes.description}
-                onPress={handlePlaySound}
-                onFavorite={handleToggleFavorite}
-                onDownload={handleDownloadSound}
-              />
+              >
+                <SoundCard
+                  soundItem={soundItem as SoundItem}
+                  isActive={activeSounds.has(soundItem.id)}
+                  isLoading={loadingSounds.has(soundItem.id)}
+                  isFavorite={favorites.has(soundItem.id)}
+                  isDownloaded={downloadedSounds.has(soundItem.id)}
+                  isDownloading={downloadingStates.has(soundItem.id)}
+                  isQuickPlayActive={
+                    isQuickPlaying && favoriteSoundId === String(soundItem.id)
+                  }
+                  isPro={pro}
+                  theme={theme}
+                  themeMode={themeMode}
+                  scaledNameSize={scaledFontSizes.name}
+                  scaledDescSize={scaledFontSizes.description}
+                  onPress={handlePlaySound}
+                  onFavorite={handleToggleFavorite}
+                  onDownload={handleDownloadSound}
+                />
+              </View>
             )}
             keyExtractor={(item) => String(item.id)}
             showsVerticalScrollIndicator={false}
@@ -1892,9 +1940,10 @@ export default function SoundsScreen() {
         <Animated.View
           style={[
             styles.playerControls,
+            isTablet && styles.playerControlsTablet,
             {
               backgroundColor: theme.background,
-              borderTopColor: theme.border,
+              borderColor: theme.border,
               transform: [{ translateY: playerSlide }],
             },
           ]}
@@ -2132,17 +2181,7 @@ const styles = StyleSheet.create({
   },
   categoryTabsContent: { paddingHorizontal: 16, gap: 8, alignItems: "center" },
   soundsList: { flex: 1, padding: 10 },
-  playerControls: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 12,
-    paddingBottom: 80,
-    borderTopWidth: 1,
-    elevation: 8,
-    zIndex: 2,
-  },
+
   timerDisplay: {
     flexDirection: "row",
     alignItems: "center",
@@ -2179,6 +2218,27 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 4,
     flexWrap: "wrap",
+  },
+  playerControls: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+    paddingBottom: 80,
+    borderTopWidth: 1,
+    elevation: 8,
+    zIndex: 2,
+  },
+  playerControlsTablet: {
+    maxWidth: 600,
+    alignSelf: "center",
+    left: 16,
+    right: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    bottom: 85,
+    paddingBottom: 12,
   },
   additionalSoundBadge: {
     flexDirection: "row",

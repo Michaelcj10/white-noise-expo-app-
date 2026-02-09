@@ -3,7 +3,13 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -36,8 +42,37 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   /* ignore errors */
 });
 
-// Onboarding Modal Component
-function OnboardingModal() {
+// Move static data outside component to prevent recreation on every render
+const ONBOARDING_SCREENS = [
+  {
+    title: "Curated Sounds",
+    subtitle: "50+ white noise, nature, and ambient sounds",
+    description: "Hand-picked audio to help you relax, sleep, or concentrate",
+    icon: "musical-notes" as const,
+    iconColor: "#3b82f6",
+    feature: "Browse our full library from the Sounds tab",
+  },
+  {
+    title: "Quick Play",
+    subtitle: "One-tap access to your favorite",
+    description: "Save any sound as your favorite and play it instantly",
+    icon: "heart" as const,
+    iconColor: "#ec4899",
+    feature: "Tap the center button to start playing",
+  },
+  {
+    title: "Mix & Match",
+    subtitle: "Layer multiple sounds together",
+    description:
+      "Combine sounds with individual volume controls for your perfect soundscape",
+    icon: "layers" as const,
+    iconColor: "#06b6d4",
+    feature: "Use the mixer to create your blend",
+  },
+] as const;
+
+// Memoized Onboarding Modal Component
+const OnboardingModal = React.memo(function OnboardingModal() {
   const { theme, themeMode } = useTheme();
   const {
     hasCompletedOnboarding,
@@ -50,36 +85,17 @@ function OnboardingModal() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Onboarding screens data
-  const onboardingScreens = [
-    {
-      title: "Curated Sounds",
-      subtitle: "50+ white noise, nature, and ambient sounds",
-      description: "Hand-picked audio to help you relax, sleep, or concentrate",
-      icon: "musical-notes" as const,
-      iconColor: "#3b82f6",
-      feature: "Browse our full library from the Sounds tab",
-    },
-    {
-      title: "Quick Play",
-      subtitle: "One-tap access to your favorite",
-      description: "Save any sound as your favorite and play it instantly",
-      icon: "heart" as const,
-      iconColor: "#ec4899",
-      feature: "Tap the center button to start playing",
-    },
-    {
-      title: "Mix & Match",
-      subtitle: "Layer multiple sounds together",
-      description:
-        "Combine sounds with individual volume controls for your perfect soundscape",
-      icon: "layers" as const,
-      iconColor: "#06b6d4",
-      feature: "Use the mixer to create your blend",
-    },
-  ];
+  // Memoize current screen to prevent object recreation
+  const currentScreen = ONBOARDING_SCREENS[onboardingStep];
 
-  const currentScreen = onboardingScreens[onboardingStep];
+  // Memoize gradient colors
+  const gradientColors = useMemo(
+    () =>
+      themeMode === "dark"
+        ? (["#0a0a0a", "#1a1a2e", "#16213e", "#0f3460"] as const)
+        : (["#f8f9ff", "#f0f4ff", "#e8f0ff", "#e0ecff"] as const),
+    [themeMode],
+  );
 
   // Animate when step changes
   useEffect(() => {
@@ -105,9 +121,22 @@ function OnboardingModal() {
     }
   }, [onboardingStep, fadeAnim, slideAnim]);
 
-  const completeOnboarding = async () => {
+  // Memoize callbacks
+  const completeOnboarding = useCallback(async () => {
     await setHasCompletedOnboarding(true);
-  };
+  }, [setHasCompletedOnboarding]);
+
+  const goBack = useCallback(() => {
+    setOnboardingStep((prev) => prev - 1);
+  }, []);
+
+  const goNext = useCallback(() => {
+    if (onboardingStep < ONBOARDING_SCREENS.length - 1) {
+      setOnboardingStep((prev) => prev + 1);
+    } else {
+      completeOnboarding();
+    }
+  }, [onboardingStep, completeOnboarding]);
 
   // Only show if loading is done and flag is false
   if (isLoadingOnboarding || hasCompletedOnboarding !== false) {
@@ -118,11 +147,7 @@ function OnboardingModal() {
     <Modal visible={true} animationType="slide" transparent={false}>
       <SafeAreaView style={{ flex: 1, backgroundColor: "#000000" }}>
         <LinearGradient
-          colors={
-            themeMode === "dark"
-              ? ["#0a0a0a", "#1a1a2e", "#16213e", "#0f3460"]
-              : ["#f8f9ff", "#f0f4ff", "#e8f0ff", "#e0ecff"]
-          }
+          colors={gradientColors}
           style={{ flex: 1 }}
           locations={[0, 0.3, 0.65, 1]}
           start={{ x: 0, y: 0 }}
@@ -147,7 +172,7 @@ function OnboardingModal() {
                   color: theme.text,
                 }}
               >
-                {onboardingStep + 1} / {onboardingScreens.length}
+                {onboardingStep + 1} / {ONBOARDING_SCREENS.length}
               </Text>
               <TouchableOpacity
                 onPress={completeOnboarding}
@@ -175,7 +200,7 @@ function OnboardingModal() {
                 marginBottom: 30,
               }}
             >
-              {onboardingScreens.map((_, index) => (
+              {ONBOARDING_SCREENS.map((_, index) => (
                 <View
                   key={index}
                   style={{
@@ -205,11 +230,7 @@ function OnboardingModal() {
                   width: "100%",
                   alignItems: "center",
                   opacity: fadeAnim,
-                  transform: [
-                    {
-                      translateY: slideAnim,
-                    },
-                  ],
+                  transform: [{ translateY: slideAnim }],
                 }}
               >
                 {/* Large Icon */}
@@ -308,7 +329,7 @@ function OnboardingModal() {
             >
               {onboardingStep > 0 && (
                 <TouchableOpacity
-                  onPress={() => setOnboardingStep(onboardingStep - 1)}
+                  onPress={goBack}
                   style={{
                     flex: 1,
                     paddingVertical: 12,
@@ -336,13 +357,7 @@ function OnboardingModal() {
                 </TouchableOpacity>
               )}
               <TouchableOpacity
-                onPress={() => {
-                  if (onboardingStep < onboardingScreens.length - 1) {
-                    setOnboardingStep(onboardingStep + 1);
-                  } else {
-                    completeOnboarding();
-                  }
-                }}
+                onPress={goNext}
                 style={{
                   flex: 1,
                   paddingVertical: 12,
@@ -362,13 +377,13 @@ function OnboardingModal() {
                     fontWeight: "700",
                   }}
                 >
-                  {onboardingStep === onboardingScreens.length - 1
+                  {onboardingStep === ONBOARDING_SCREENS.length - 1
                     ? "Get Started"
                     : "Next"}
                 </Text>
                 <Ionicons
                   name={
-                    onboardingStep === onboardingScreens.length - 1
+                    onboardingStep === ONBOARDING_SCREENS.length - 1
                       ? "play"
                       : "arrow-forward"
                   }
@@ -382,7 +397,7 @@ function OnboardingModal() {
       </SafeAreaView>
     </Modal>
   );
-}
+});
 
 function RootLayoutContent() {
   const [appReady, setAppReady] = useState(false);
@@ -391,7 +406,13 @@ function RootLayoutContent() {
   });
   const { isLoadingOnboarding } = useOnboarding();
 
+  // Track if initialization has been done to prevent double execution
+  const initRef = useRef(false);
+
   useEffect(() => {
+    // Prevent double initialization
+    if (initRef.current) return;
+
     async function prepare() {
       try {
         // Initialize analytics
@@ -405,6 +426,8 @@ function RootLayoutContent() {
 
         // Wait for fonts to load and onboarding status to be determined
         if (loaded && !isLoadingOnboarding) {
+          initRef.current = true;
+
           // Hide native splash immediately since we have custom splash
           await SplashScreen.hideAsync();
 
@@ -424,7 +447,7 @@ function RootLayoutContent() {
     prepare();
   }, [loaded, isLoadingOnboarding]);
 
-  // Track app state changes
+  // Track app state changes - separate effect with stable reference
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === "background" || nextAppState === "inactive") {
