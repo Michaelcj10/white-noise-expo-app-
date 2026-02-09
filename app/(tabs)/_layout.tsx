@@ -10,7 +10,14 @@ import * as Haptics from "expo-haptics";
 import { Tabs, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
-import { Animated, Modal, Text, TouchableOpacity, View } from "react-native";
+import {
+  Animated,
+  Modal,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../contexts/themecontext";
 
@@ -78,6 +85,7 @@ export default function TabLayout() {
   } = useQuickPlay();
   const [quickPlaySound, setQuickPlaySound] = useState<any>(null);
   const [showNoQuickPlayModal, setShowNoQuickPlayModal] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
 
   const loadFavoriteSound = async () => {
     const storedId = await Storage.getItem("favorite_sound_id");
@@ -199,34 +207,52 @@ export default function TabLayout() {
     ]).start();
   };
 
-  const handleButtonPress = (e: { preventDefault: () => void } | undefined) => {
+  const handleButtonPress = (
+    e?: { preventDefault: () => void } | undefined,
+  ) => {
     // Immediate light haptic feedback on button press for responsiveness
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     animateButtonPress();
     handlePanicPress(e);
   };
 
-  // Custom panic button component
+  // Placeholder for tab bar spacing - just an empty view
+  const PanicButtonPlaceholder = () => {
+    return <View style={{ width: 64, height: 40 }} />;
+  };
+
+  // Actual floating panic button - absolutely positioned using screen width for exact centering
   const PanicButton = () => {
     const favoriteSound = WHITE_NOISE_SOUNDS.find(
       (s) => String(s.id) === favoriteSoundId,
     );
 
+    const buttonSize = 64;
+    const containerWidth = 100; // Wider to accommodate label
+    const labelText = favoriteSoundId
+      ? favoriteSound?.name.substring(0, 12) || "Quick Play"
+      : "Set Quick Play";
+
     return (
       <Animated.View
+        pointerEvents="box-none"
         style={{
+          position: "absolute",
+          bottom: insets.bottom > 0 ? insets.bottom + 8 : 28,
+          left: (screenWidth - containerWidth) / 2,
+          width: containerWidth,
+          zIndex: 999,
+          alignItems: "center",
           transform: [{ scale: scaleAnim }],
         }}
       >
         <TouchableOpacity
           onPress={handleButtonPress}
           style={{
-            position: "relative",
-            top: -15,
             width: 64,
             height: 64,
             borderRadius: 32,
-            backgroundColor: theme.primary,
+            backgroundColor: isQuickPlaying ? "#3b82f6" : theme.primary,
             justifyContent: "center",
             alignItems: "center",
             shadowColor: "#000",
@@ -234,8 +260,6 @@ export default function TabLayout() {
             shadowOpacity: 0.3,
             shadowRadius: 8,
             elevation: 8,
-            borderWidth: 3,
-            borderColor: "transparent",
           }}
         >
           <Ionicons
@@ -264,6 +288,18 @@ export default function TabLayout() {
             />
           )}
         </TouchableOpacity>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: "600",
+            color: theme.textSecondary,
+            marginTop: 6,
+            textAlign: "center",
+          }}
+          numberOfLines={1}
+        >
+          {labelText}
+        </Text>
       </Animated.View>
     );
   };
@@ -324,12 +360,13 @@ export default function TabLayout() {
           redirect={false}
           name="panic"
           options={{
-            title: favoriteSoundId
-              ? WHITE_NOISE_SOUNDS.find(
-                  (s) => String(s.id) === favoriteSoundId,
-                )?.name.substring(0, 12) || "Quick Play"
-              : "Set Quick Play",
-            tabBarIcon: ({ color, focused }) => <PanicButton />,
+            title: "",
+            tabBarLabel: () => null,
+            tabBarIcon: () => <PanicButtonPlaceholder />,
+            tabBarItemStyle: {
+              // Minimal width - just enough for the placeholder
+              maxWidth: 70,
+            },
           }}
           listeners={{
             tabPress: (e) => {
@@ -369,6 +406,9 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
+
+      {/* Floating center button - absolutely positioned for proper centering */}
+      <PanicButton />
 
       {/* No Quick Play Sound Modal */}
       <Modal visible={showNoQuickPlayModal} animationType="fade" transparent>

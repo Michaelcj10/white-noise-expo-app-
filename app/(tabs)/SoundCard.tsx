@@ -173,7 +173,6 @@ export const SoundCard = React.memo(
     const showDownloadButton =
       !soundItem.isLocal && !isDownloaded && (isPro || !soundItem.premium);
     const showProBadge = soundItem.premium && !isPro;
-    const isHighlighted = isActive || isQuickPlayActive;
 
     return (
       <Animated.View style={{ transform: [{ scale: cardScale }] }}>
@@ -181,9 +180,14 @@ export const SoundCard = React.memo(
           style={[
             styles.soundCard,
             { backgroundColor: theme.surface, borderColor: theme.border },
-            isHighlighted && {
+            isActive && {
               borderColor: theme.primary,
               backgroundColor: theme.card,
+              borderWidth: 2.5,
+            },
+            isQuickPlayActive && {
+              borderColor: "#3b82f6",
+              backgroundColor: "#3b82f620",
               borderWidth: 2.5,
             },
           ]}

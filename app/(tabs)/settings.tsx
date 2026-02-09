@@ -125,19 +125,22 @@ export default function SettingsScreen() {
       setConfirmClearCacheVisible(false);
       setInfoModalContent({
         title: "Cache Cleared",
-        message: "All offline sounds have been removed. Your device storage has been freed up.",
+        message:
+          "All offline sounds have been removed. Your device storage has been freed up.",
         icon: "checkmark-circle",
       });
       setInfoModalVisible(true);
-      showToast("Offline sounds cleared", "success");
-    } catch (error) {
+    } catch {
       showNotification(
         "Error",
         "Failed to clear offline sounds. Please try again.",
         "error",
       );
     }
-  }; = (baseSize: number): number => {
+  };
+
+  // Helper function to apply text size multiplier
+  const getScaledFontSize = (baseSize: number): number => {
     switch (textSize) {
       case "small":
         return Math.round(baseSize * 0.85);
@@ -689,16 +692,18 @@ export default function SettingsScreen() {
           color={autoCheckUpdates ? theme.primary : theme.surface}
         />
 
-        <SectionHeader title="Data & Storage" />
         {offlineSoundsCount > 0 && (
-          <SettingItem
-            icon="trash"
-            title="Clear Offline Sounds"
-            description={`${offlineSoundsCount} sound${offlineSoundsCount !== 1 ? "s" : ""} saved • Free up space`}
-            onPress={() => setConfirmClearCacheVisible(true)}
-            showArrow={false}
-            color={theme.error}
-          />
+          <>
+            <SectionHeader title="Data & Storage" />
+            <SettingItem
+              icon="trash"
+              title="Clear Offline Sounds"
+              description={`${offlineSoundsCount} sound${offlineSoundsCount !== 1 ? "s" : ""} saved • Free up space`}
+              onPress={() => setConfirmClearCacheVisible(true)}
+              showArrow={false}
+              color={theme.error}
+            />
+          </>
         )}
 
         <SectionHeader title="Support" />
@@ -1848,7 +1853,9 @@ export default function SettingsScreen() {
                   lineHeight: 22,
                 }}
               >
-                This will delete {offlineSoundsCount} saved sound{offlineSoundsCount !== 1 ? "s" : ""} and free up device storage. You can re-download them later.
+                This will delete {offlineSoundsCount} saved sound
+                {offlineSoundsCount !== 1 ? "s" : ""} and free up device
+                storage. You can re-download them later.
               </Text>
             </View>
 

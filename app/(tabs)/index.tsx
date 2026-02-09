@@ -1044,13 +1044,14 @@ export default function SoundsScreen() {
 
   // Cleanup sounds
   const cleanupExistingSounds = useCallback(async (): Promise<void> => {
-    if (activeSounds.size === 0) return;
+    if (activeSoundsRef.current.size === 0) return;
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    for (const [_id, data] of activeSounds.entries()) {
+    for (const [_id, data] of activeSoundsRef.current.entries()) {
       if (data?.sound) {
         try {
           data.sound.setOnPlaybackStatusUpdate(null);
+          await data.sound.pauseAsync().catch(() => {});
           await data.sound.stopAsync().catch(() => {});
           await data.sound.unloadAsync().catch(() => {});
         } catch {}
@@ -1060,7 +1061,7 @@ export default function SoundsScreen() {
     try {
       await hidePlayingNotification();
     } catch {}
-  }, [activeSounds]);
+  }, []);
 
   // Load new sound
   const loadNewSound = useCallback(
@@ -1098,7 +1099,11 @@ export default function SoundsScreen() {
         setDownloadedSounds((prev) => new Set(prev).add(soundItem.id));
       }
 
-      const { sound: newSound } = await Audio.Sound.createAsync(
+      // Reconfigure audio session before creating sound (fixes stale session after idle)
+      await configureAudioSession();
+
+      // Create sound with timeout to prevent infinite hang when audio system is stalled
+      const createSoundPromise = Audio.Sound.createAsync(
         source,
         {
           isLooping: true,
@@ -1111,6 +1116,21 @@ export default function SoundsScreen() {
         false,
       );
 
+      const createSoundTimeout = new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error("Audio creation timeout - audio system may be stalled"),
+            ),
+          10000,
+        ),
+      );
+
+      const { sound: newSound } = await Promise.race([
+        createSoundPromise,
+        createSoundTimeout,
+      ]);
+
       return {
         sound: newSound,
         soundItem,
@@ -1119,7 +1139,7 @@ export default function SoundsScreen() {
         id: soundItem.id,
       };
     },
-    [globalMuted, showSnackbar],
+    [globalMuted, showSnackbar, configureAudioSession],
   );
 
   // ==================== SOUND CARD HANDLERS (MEMOIZED) ====================
@@ -1201,8 +1221,6 @@ export default function SoundsScreen() {
     },
     [
       pro,
-      activeSounds,
-      isPlaying,
       cleanupExistingSounds,
       loadNewSound,
       retryAudioOperation,
@@ -1342,17 +1360,18 @@ export default function SoundsScreen() {
   }, [activeSounds, retryAudioOperation, fadeInSound]);
 
   const stopAllSounds = useCallback(async () => {
-    const soundCount = activeSounds.size;
+    const soundCount = activeSoundsRef.current.size;
 
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
 
-    for (const [, data] of activeSounds.entries()) {
+    for (const [, data] of activeSoundsRef.current.entries()) {
       if (data?.sound) {
         try {
           data.sound.setOnPlaybackStatusUpdate(null);
+          await data.sound.pauseAsync().catch(() => {});
           await data.sound.stopAsync().catch(() => {});
           await data.sound.unloadAsync().catch(() => {});
         } catch {}
@@ -1370,7 +1389,7 @@ export default function SoundsScreen() {
     }
 
     hidePlayingNotification().catch(() => {});
-  }, [activeSounds]);
+  }, []);
 
   const toggleSoundInMixer = useCallback(
     async (soundItem: any) => {
@@ -1525,6 +1544,20 @@ export default function SoundsScreen() {
     }, []),
   );
 
+  // Reload downloaded sounds on focus (to reflect changes from settings)
+  useFocusEffect(
+    useCallback(() => {
+      const downloadedIds = soundCache.getDownloadedSoundIds();
+      const newDownloadedSounds = new Set(downloadedIds);
+      setDownloadedSounds(newDownloadedSounds);
+
+      // If offline tab is selected and no more offline sounds, switch to "All"
+      if (selectedCategory === "Downloaded" && newDownloadedSounds.size === 0) {
+        setSelectedCategory(SOUND_CATEGORIES.ALL);
+      }
+    }, [selectedCategory]),
+  );
+
   // Timer effect
   useEffect(() => {
     if (timerIntervalRef.current) {
@@ -1621,8 +1654,33 @@ export default function SoundsScreen() {
     pauseAllSoundsRef.current = pauseAllSounds;
   }, [pauseAllSounds]);
 
+  // Track previous app state to detect foreground transitions
+  const appStateRef = useRef(AppState.currentState);
+  const configureAudioSessionRef = useRef(configureAudioSession);
+
   useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
+    configureAudioSessionRef.current = configureAudioSession;
+  }, [configureAudioSession]);
+
+  useEffect(() => {
+    const handleAppStateChange = async (
+      nextAppState: typeof AppState.currentState,
+    ) => {
+      const previousState = appStateRef.current;
+      appStateRef.current = nextAppState;
+
+      // When app becomes active after being inactive/background, reconfigure audio session
+      // This fixes the "spinning forever" bug when audio system becomes stale after idle
+      if (
+        nextAppState === "active" &&
+        (previousState === "background" || previousState === "inactive")
+      ) {
+        try {
+          await configureAudioSessionRef.current();
+        } catch {}
+      }
+
+      // Pause sounds when going to background (if background play disabled)
       if (
         (nextAppState === "background" || nextAppState === "inactive") &&
         !backgroundPlayEnabled &&
