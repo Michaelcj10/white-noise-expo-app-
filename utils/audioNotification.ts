@@ -78,7 +78,7 @@ export const setupAudioNotifications = async () => {
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== "granted") {
       console.log(
-        "📢 Notification permission not granted - app will work without notifications"
+        "📢 Notification permission not granted - app will work without notifications",
       );
       return false;
     }
@@ -108,7 +108,7 @@ export const setupAudioNotifications = async () => {
     // Gracefully handle any setup errors
     console.log(
       "📢 Unable to setup notifications (app will continue without them):",
-      error
+      error,
     );
     return false;
   }
@@ -116,7 +116,7 @@ export const setupAudioNotifications = async () => {
 
 export const showPlayingNotification = async (
   soundName: string,
-  isPaused: boolean = false
+  isPaused: boolean = false,
 ) => {
   try {
     // Skip notifications on web
@@ -144,7 +144,7 @@ export const showPlayingNotification = async (
     // Show new persistent notification with controls
     currentNotificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: isPaused ? "Slumbr - Paused" : "Slumbr - Now Playing",
+        title: isPaused ? "Drowse - Paused" : "Drowse - Now Playing",
         body: `${soundName}`,
         sound: undefined,
         priority: Notifications.AndroidNotificationPriority.LOW,
@@ -164,20 +164,20 @@ export const showPlayingNotification = async (
     console.log(
       "📢 Notification shown for:",
       soundName,
-      isPaused ? "(Paused)" : ""
+      isPaused ? "(Paused)" : "",
     );
   } catch (error) {
     // Gracefully handle notification errors - app continues working
     console.log(
       "📢 Unable to show notification (continuing without it):",
-      error
+      error,
     );
   }
 };
 
 export const updatePlayingNotification = async (
   soundName: string,
-  isPaused: boolean = false
+  isPaused: boolean = false,
 ) => {
   // Skip on web
   if (Platform.OS === "web") {
@@ -202,7 +202,7 @@ export const hidePlayingNotification = async () => {
     // Gracefully handle dismiss errors - notification might already be gone
     console.log(
       "📢 Unable to dismiss notification (it may have been dismissed already):",
-      error
+      error,
     );
     currentNotificationId = null; // Clear the ID anyway
   }

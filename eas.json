@@ -24,7 +24,11 @@
     "production": {
       "autoIncrement": true,
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "env": {
+        "EAS_BUILD_OPTIMIZE_ASSETS": "1"
       }
     }
   },

@@ -4,8 +4,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet } from "react-native";
 
-const darkLogo = require("../assets/images/slumbr_logo_dark.svg");
-const whiteLogo = require("../assets/images/slumbr_logo_light.svg");
+const darkLogo = require("../assets/images/drowse_logo_dark.svg");
+const whiteLogo = require("../assets/images/drowse_logo_light.svg");
 
 export const CustomSplash: React.FC = () => {
   const { themeMode } = useTheme();

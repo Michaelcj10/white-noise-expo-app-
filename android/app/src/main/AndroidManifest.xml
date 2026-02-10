@@ -30,7 +30,7 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="slumbr"/>
+        <data android:scheme="drowse"/>
         <data android:scheme="exp+whitenoiseapp"/>
       </intent-filter>
     </activity>

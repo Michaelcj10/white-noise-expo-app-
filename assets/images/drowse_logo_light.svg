@@ -1,4 +1,4 @@
-<svg width="403" height="200" viewBox="27 0 403 200" xmlns="http://www.w3.org/2000/svg">
+<svg width="420" height="200" viewBox="20 0 420 200" xmlns="http://www.w3.org/2000/svg">
     <g>
         <!-- Moon with outlined craters -->
         <g transform="translate(70, 100)">
@@ -20,6 +20,6 @@
         </g>
         
         <!-- Text in black -->
-        <text x="140" y="120" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="black">slumbr</text>
+        <text x="140" y="120" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="black">drowse</text>
     </g>
 </svg>

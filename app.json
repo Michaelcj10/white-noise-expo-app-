@@ -1,37 +1,31 @@
 {
   "expo": {
-    "name": "Slumbr",
+    "name": "Drowse",
     "slug": "WhiteNoiseApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
-    "scheme": "slumbr",
+    "scheme": "drowse",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": [
-          "audio"
-        ],
+        "UIBackgroundModes": ["audio"],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.slumbr.whitenoiseapp"
+      "bundleIdentifier": "com.drowse.whitenoiseapp"
     },
     "android": {
-      "package": "com.slumbr.whitenoiseapp",
-      "versionCode": 3,
+      "package": "com.drowse.whitenoiseapp",
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-foreground.png",
         "backgroundColor": "#0A0903"
       },
       "edgeToEdgeEnabled": true,
-      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.slumbr.whitenoiseapp",
-      "permissions": [
-        "POST_NOTIFICATIONS",
-        "FOREGROUND_SERVICE",
-        "WAKE_LOCK"
-      ]
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.drowse.whitenoiseapp",
+      "permissions": ["POST_NOTIFICATIONS", "FOREGROUND_SERVICE", "WAKE_LOCK"]
     },
     "web": {
       "bundler": "metro",

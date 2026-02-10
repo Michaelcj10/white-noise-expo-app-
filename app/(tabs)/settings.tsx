@@ -345,8 +345,8 @@ export default function SettingsScreen() {
       try {
         const url =
           Platform.OS === "ios"
-            ? "itms-apps://apps.apple.com/app/slumbr/XXXXXXX?action=write-review"
-            : "https://play.google.com/store/apps/details?id=com.slumbr.app";
+            ? "itms-apps://apps.apple.com/app/drowse/XXXXXXX?action=write-review"
+            : "https://play.google.com/store/apps/details?id=com.drowse.whitenoiseapp";
         await Linking.openURL(url);
         Analytics.track("Rate App", { action: "opened_store_fallback" });
       } catch (linkError) {
@@ -361,11 +361,11 @@ export default function SettingsScreen() {
   };
 
   const handleTermsPress = () => {
-    Linking.openURL("https://slumbr.space/terms");
+    Linking.openURL("https://drowse.space/terms");
   };
 
   const handlePrivacyPress = () => {
-    Linking.openURL("https://slumbr.space/privacy");
+    Linking.openURL("https://drowse.space/privacy");
   };
 
   const handleTextSizeChange = async (size: "small" | "normal" | "large") => {
@@ -805,7 +805,7 @@ export default function SettingsScreen() {
                   marginLeft: 8,
                 }}
               >
-                Slumbr Pro Active
+                Drowse Pro Active
               </Text>
             </View>
             <Text
@@ -1187,7 +1187,7 @@ export default function SettingsScreen() {
                 style={styles.aboutIcon}
               />
               <Text style={[styles.aboutTitle, { color: theme.text }]}>
-                Slumbr
+                Drowse
               </Text>
               <Text
                 style={[styles.aboutVersion, { color: theme.textSecondary }]}
@@ -1205,7 +1205,7 @@ export default function SettingsScreen() {
               </Text>
 
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
-                Slumbr was created with one simple goal: to help you fall asleep
+                Drowse was created with one simple goal: to help you fall asleep
                 faster and sleep more deeply. We know how frustrating it can be
                 to lie awake at night, your mind racing, struggling to switch
                 off. Thats where we come in.
@@ -1221,7 +1221,7 @@ export default function SettingsScreen() {
               </Text>
 
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
-                Slumbr offers a carefully curated collection of ambient sounds
+                Drowse offers a carefully curated collection of ambient sounds
                 designed to mask distracting noises, calm your mind, and create
                 the perfect environment for restful sleep. From gentle rain and
                 ocean waves to white noise and peaceful forest soundscapes,
@@ -1234,7 +1234,7 @@ export default function SettingsScreen() {
                   { color: theme.text, fontWeight: "700", marginTop: 12 },
                 ]}
               >
-                Why Slumbr?
+                Why Drowse?
               </Text>
 
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
@@ -1258,7 +1258,7 @@ export default function SettingsScreen() {
 
               <Text style={[styles.aboutDescription, { color: theme.text }]}>
                 We believe good sleep shouldnt be complicated or expensive.
-                Slumbr is built to do one thing exceptionally well: help you
+                Drowse is built to do one thing exceptionally well: help you
                 sleep. No gimmicks, no clutter—just soothing sounds when you
                 need them.
               </Text>

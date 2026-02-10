@@ -8,9 +8,10 @@ import Purchases, {
 } from "react-native-purchases";
 
 // RevenueCat Configuration
+// Project ID: projb5fc2109 (for dashboard reference)
 const REVENUECAT_API_KEYS = {
-  android: "test_eTsZgLkXYPzfShLHWZYItgPVmqu",
-  ios: "test_eTsZgLkXYPzfShLHWZYItgPVmqu", // Use same key for both platforms or add iOS key
+  android: "test_RkRHTuKBoKajkGhzyZOvMnKaBkC",
+  ios: "test_RkRHTuKBoKajkGhzyZOvMnKaBkC", // Use same key for both platforms or add iOS key
 };
 
 const REVENUECAT_CONFIG = {
@@ -18,18 +19,53 @@ const REVENUECAT_CONFIG = {
     android: REVENUECAT_API_KEYS.android,
     ios: REVENUECAT_API_KEYS.ios,
   }) as string,
-  entitlementId: "slumbr Pro", // Your entitlement identifier
+  entitlementId: "drowse Pro", // Your entitlement identifier
+};
+
+// Product identifiers for your offerings (from RevenueCat dashboard)
+export const PRODUCT_IDENTIFIERS = {
+  monthly: "monthly",
+  lifetime: "lifetime",
+  // yearly: "yearly", // Add this if you create a yearly product
 };
 
 interface RevenueCatContextType {
+  // Subscription state
   isPro: boolean;
   isLoading: boolean;
   customerInfo: CustomerInfo | null;
   offerings: PurchasesOffering | null;
-  purchasePackage: (pkg: PurchasesPackage) => Promise<{ success: boolean }>;
-  restorePurchases: () => Promise<{ success: boolean }>;
+
+  // Purchase methods
+  purchasePackage: (
+    pkg: PurchasesPackage,
+  ) => Promise<{ success: boolean; error?: string }>;
+  restorePurchases: () => Promise<{
+    success: boolean;
+    restoredPurchases: boolean;
+  }>;
+
+  // Custom paywall state (for fallback)
   showPaywall: boolean;
   setShowPaywall: (show: boolean) => void;
+
+  // RevenueCat Native Paywall
+  presentPaywall: () => Promise<{ purchased: boolean; restored: boolean }>;
+  presentPaywallIfNeeded: () => Promise<{
+    purchased: boolean;
+    restored: boolean;
+  }>;
+
+  // Customer Center
+  presentCustomerCenter: () => Promise<void>;
+
+  // Subscription info helpers
+  getActiveSubscriptionInfo: () => {
+    productId: string | null;
+    expirationDate: string | null;
+    willRenew: boolean;
+    periodType: string | null;
+  } | null;
 }
 
 const RevenueCatContext = createContext<RevenueCatContextType>({
@@ -38,9 +74,13 @@ const RevenueCatContext = createContext<RevenueCatContextType>({
   customerInfo: null,
   offerings: null,
   purchasePackage: async () => ({ success: false }),
-  restorePurchases: async () => ({ success: false }),
+  restorePurchases: async () => ({ success: false, restoredPurchases: false }),
   showPaywall: false,
   setShowPaywall: () => {},
+  presentPaywall: async () => ({ purchased: false, restored: false }),
+  presentPaywallIfNeeded: async () => ({ purchased: false, restored: false }),
+  presentCustomerCenter: async () => {},
+  getActiveSubscriptionInfo: () => null,
 });
 
 export const useRevenueCat = () => useContext(RevenueCatContext);
@@ -189,7 +229,7 @@ export const RevenueCatProvider = ({
     );
     console.log("🔍 Looking for entitlement:", REVENUECAT_CONFIG.entitlementId);
 
-    // Check if user has active entitlement for "slumbr Pro"
+    // Check if user has active entitlement for "Drowse Pro"
     const hasProAccess =
       info.entitlements.active[REVENUECAT_CONFIG.entitlementId] !== undefined;
 

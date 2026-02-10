@@ -1,4 +1,4 @@
-package com.slumbr.whitenoiseapp
+package com.drowse.whitenoiseapp
 
 import android.app.Application
 import android.content.res.Configuration

@@ -1,4 +1,4 @@
-package com.slumbr.whitenoiseapp
+package com.drowse.whitenoiseapp
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

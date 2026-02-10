@@ -128,7 +128,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                 <Ionicons name="star" size={24} color="#FFD700" />
               </View>
               <Text style={[styles.title, { color: theme.text }]}>
-                Upgrade to Slumbr Pro
+                Upgrade to Drowse Pro
               </Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
                 Save unlimited sounds offline • Advanced mixing • No ads
