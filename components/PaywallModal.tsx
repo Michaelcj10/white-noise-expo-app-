@@ -1,6 +1,7 @@
 import { useNotification } from "@/contexts/notification";
 import { Analytics } from "@/utils/analytics";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -21,8 +22,9 @@ interface PaywallModalProps {
 }
 
 export function PaywallModal({ visible, onClose }: PaywallModalProps) {
-  const { theme } = useTheme();
+  const { theme, themeMode } = useTheme();
   const { showNotification } = useNotification();
+  const isDark = themeMode === "dark";
   const { isPro, offerings, purchasePackage, restorePurchases } =
     useRevenueCat();
   const [loading, setLoading] = useState(false);
@@ -48,8 +50,11 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
         "success",
       );
       onClose();
+    } else if (result.error && result.error !== "cancelled") {
+      Analytics.trackPurchaseFailed(pkg.identifier, result.error);
+      showNotification("Purchase Failed", result.error, "error");
     } else {
-      Analytics.trackPurchaseFailed(pkg.identifier, "Purchase failed");
+      Analytics.trackPurchaseFailed(pkg.identifier, "Purchase cancelled");
     }
   };
 
@@ -86,7 +91,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
       text: "Sound mixing offline (free users: streaming only)",
     },
     {
-      icon: "wifi-off",
+      icon: "cloud-offline-outline",
       text: "Auto-save favorites for offline use",
     },
     {
@@ -103,14 +108,21 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
       onRequestClose={onClose}
     >
       <View style={styles.container}>
-        <View
+        <LinearGradient
+          colors={
+            isDark
+              ? ["#0a0a0a", "#1a1a2e", "#16213e", "#0f3460"]
+              : ["#f8f9ff", "#f0f4ff", "#e8f0ff", "#e0ecff"]
+          }
           style={[
             styles.content,
             {
-              backgroundColor: theme.surface,
               borderTopColor: theme.border,
             },
           ]}
+          locations={[0, 0.3, 0.65, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
         >
           {/* Close button */}
           <TouchableOpacity
@@ -311,7 +323,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
               Auto-renewing subscription. Cancel anytime. Terms apply.
             </Text>
           </ScrollView>
-        </View>
+        </LinearGradient>
       </View>
     </Modal>
   );

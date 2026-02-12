@@ -31,6 +31,7 @@ import {
   Animated,
   AppState,
   Easing,
+  InteractionManager,
   Modal,
   Platform,
   ScrollView,
@@ -845,7 +846,7 @@ export default function SoundsScreen() {
     >
   >(new Map());
   const [selectedCategory, setSelectedCategory] = useState<
-    SoundCategory | "Favourites" | "Downloaded"
+    SoundCategory | "Favourites"
   >(SOUND_CATEGORIES.ALL);
   const [isPlaying, setIsPlaying] = useState(false);
   const [globalMuted, setGlobalMuted] = useState(false);
@@ -858,12 +859,6 @@ export default function SoundsScreen() {
   const [mixerModalVisible, setMixerModalVisible] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
-  const [downloadedSounds, setDownloadedSounds] = useState<Set<number>>(
-    new Set([0, 1, 2]),
-  );
-  const [downloadingStates, setDownloadingStates] = useState<Set<number>>(
-    new Set(),
-  );
 
   // Refs
   const timerIntervalRef = useRef<any>(null);
@@ -1071,41 +1066,29 @@ export default function SoundsScreen() {
     async (soundItem: any) => {
       let source: any;
       try {
-        const sourcePromise = soundCache.getSource(soundItem, true, true);
+        // Don't auto-download during initial load - it can interfere with streaming playback
+        // Downloads will happen explicitly via the download button
+        const sourcePromise = soundCache.getSource(soundItem, false, false);
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Timeout")), 5000),
         );
         source = await Promise.race([sourcePromise, timeoutPromise]);
-      } catch {
+        console.log(`📦 Got source for ${soundItem.name}:`, source);
+      } catch (err) {
+        console.error(`🔴 Failed to get source for ${soundItem.name}:`, err);
         throw new Error(`Cannot load ${soundItem.name}`);
-      }
-
-      if (!soundCache.isDownloaded(soundItem.id)) {
-        soundCache.onDownloadComplete(
-          soundItem.id,
-          (completedId: number, success: boolean) => {
-            if (success) {
-              setDownloadedSounds((prev) => new Set(prev).add(completedId));
-              const sound = WHITE_NOISE_SOUNDS.find(
-                (s) => s.id === completedId,
-              );
-              if (sound) {
-                showSnackbar(`${sound.name} saved for offline`);
-                safeAnalytics.trackSoundDownloaded(completedId, sound.name);
-              }
-            }
-          },
-        );
-      }
-
-      if (soundCache.isDownloaded(soundItem.id)) {
-        setDownloadedSounds((prev) => new Set(prev).add(soundItem.id));
       }
 
       // Reconfigure audio session before creating sound (fixes stale session after idle)
       await configureAudioSession();
 
       // Create sound with timeout to prevent infinite hang when audio system is stalled
+      console.log(`🎵 Creating audio for ${soundItem.name}...`);
+
+      // Use SimpleExoPlayer for streaming (better buffering), MediaPlayer for local
+      const isStreaming =
+        !soundItem.isLocal && !soundCache.isDownloaded(soundItem.id);
+
       const createSoundPromise = Audio.Sound.createAsync(
         source,
         {
@@ -1113,7 +1096,10 @@ export default function SoundsScreen() {
           volume: 0,
           shouldPlay: false,
           progressUpdateIntervalMillis: 1000,
-          androidImplementation: "MediaPlayer",
+          // SimpleExoPlayer handles streaming better, MediaPlayer for local files
+          androidImplementation: isStreaming
+            ? "SimpleExoPlayer"
+            : "MediaPlayer",
         },
         undefined,
         false,
@@ -1129,10 +1115,18 @@ export default function SoundsScreen() {
         ),
       );
 
-      const { sound: newSound } = await Promise.race([
-        createSoundPromise,
-        createSoundTimeout,
-      ]);
+      let newSound;
+      try {
+        const result = await Promise.race([
+          createSoundPromise,
+          createSoundTimeout,
+        ]);
+        newSound = result.sound;
+        console.log(`✅ Audio created for ${soundItem.name}`);
+      } catch (err) {
+        console.error(`🔴 Audio creation failed for ${soundItem.name}:`, err);
+        throw err;
+      }
 
       return {
         sound: newSound,
@@ -1142,7 +1136,7 @@ export default function SoundsScreen() {
         id: soundItem.id,
       };
     },
-    [globalMuted, showSnackbar, configureAudioSession],
+    [globalMuted, configureAudioSession],
   );
 
   // ==================== SOUND CARD HANDLERS (MEMOIZED) ====================
@@ -1212,8 +1206,27 @@ export default function SoundsScreen() {
         setSelectedSounds(new Set());
 
         showPlayingNotification(soundItem.name, false).catch(() => {});
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
+        // Auto-cache remote sounds for offline use after successful playback
+        // Skip local sounds (isLocal: true) as they're already bundled with the app
+        if (!soundItem.isLocal) {
+          InteractionManager.runAfterInteractions(() => {
+            setTimeout(() => {
+              soundCache
+                .initiateDownload(soundItem, pro)
+                .then((success) => {
+                  if (success) {
+                    console.log(
+                      `✅ Auto-cached ${soundItem.name} for offline use`,
+                    );
+                  }
+                })
+                .catch(() => {});
+            }, 2000);
+          });
+        }
       } catch (error) {
+        console.error("🔴 Playback error for sound:", soundItem.name, error);
         setLoadingSounds((prev) => {
           const newSet = new Set(prev);
           newSet.delete(soundItem.id);
@@ -1249,6 +1262,11 @@ export default function SoundsScreen() {
         if (newFavorites.has(soundId)) {
           newFavorites.delete(soundId);
           safeAnalytics.trackFavoriteRemoved(soundId, sound?.name || "Unknown");
+
+          // Reset to all sounds if removing last favorite while viewing Favourites
+          if (newFavorites.size === 0 && selectedCategory === "Favourites") {
+            setSelectedCategory(SOUND_CATEGORIES.ALL);
+          }
         } else {
           newFavorites.add(soundId);
           safeAnalytics.trackFavoriteAdded(
@@ -1268,58 +1286,7 @@ export default function SoundsScreen() {
         return newFavorites;
       });
     },
-    [pro],
-  );
-
-  const handleDownloadSound = useCallback(
-    async (soundItem: SoundItem) => {
-      const isFreeDownloadable = !soundItem.premium;
-
-      if (!pro && !isFreeDownloadable) {
-        showSnackbar("Upgrade to Pro to save sounds for offline use");
-        safeAnalytics.trackPaywallViewed("offline_limit");
-        setPaywallOpen(true);
-        return;
-      }
-
-      if (soundItem.isLocal || downloadingStates.has(soundItem.id)) return;
-
-      const isOnline = await checkNetworkConnectivity();
-      if (!isOnline) {
-        showSnackbar("Cannot download in offline mode.");
-        return;
-      }
-
-      setDownloadingStates((prev) => new Set(prev).add(soundItem.id));
-
-      try {
-        const success = await soundCache.initiateDownload(soundItem, pro);
-        if (success) {
-          setDownloadedSounds((prev) => new Set(prev).add(soundItem.id));
-          showSnackbar(`${soundItem.name} saved for offline use!`);
-          safeAnalytics.trackSoundDownloaded(soundItem.id, soundItem.name);
-        } else {
-          if (!pro && !soundCache.canDownloadMore(pro)) {
-            showSnackbar(
-              "Free users can save 1 offline sound. Upgrade to Pro for unlimited.",
-            );
-            safeAnalytics.trackPaywallViewed("offline_limit");
-            setPaywallOpen(true);
-          } else {
-            showSnackbar(`Failed to download ${soundItem.name}`);
-          }
-        }
-      } catch {
-        showSnackbar(`Error downloading ${soundItem.name}`);
-      } finally {
-        setDownloadingStates((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(soundItem.id);
-          return newSet;
-        });
-      }
-    },
-    [pro, downloadingStates, showSnackbar],
+    [pro, selectedCategory],
   );
 
   // ==================== PLAYBACK CONTROLS ====================
@@ -1473,7 +1440,7 @@ export default function SoundsScreen() {
 
   // Category selection
   const handleSelectCategory = useCallback(
-    (category: SoundCategory | "Favourites" | "Downloaded") => {
+    (category: SoundCategory | "Favourites") => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setSelectedCategory(category);
     },
@@ -1500,8 +1467,6 @@ export default function SoundsScreen() {
       if (!mounted) return;
       try {
         await soundCache.initialize();
-        const downloadedIds = soundCache.getDownloadedSoundIds();
-        setDownloadedSounds(new Set(downloadedIds));
         await configureAudioSession();
         setupAudioNotifications();
       } catch {}
@@ -1545,20 +1510,6 @@ export default function SoundsScreen() {
       };
       loadFavorites();
     }, []),
-  );
-
-  // Reload downloaded sounds on focus (to reflect changes from settings)
-  useFocusEffect(
-    useCallback(() => {
-      const downloadedIds = soundCache.getDownloadedSoundIds();
-      const newDownloadedSounds = new Set(downloadedIds);
-      setDownloadedSounds(newDownloadedSounds);
-
-      // If offline tab is selected and no more offline sounds, switch to "All"
-      if (selectedCategory === "Downloaded" && newDownloadedSounds.size === 0) {
-        setSelectedCategory(SOUND_CATEGORIES.ALL);
-      }
-    }, [selectedCategory]),
   );
 
   // Timer effect
@@ -1748,14 +1699,12 @@ export default function SoundsScreen() {
   const filteredSounds = useMemo(() => {
     return WHITE_NOISE_SOUNDS.filter((sound) => {
       if (selectedCategory === "Favourites") return favorites.has(sound.id);
-      if (selectedCategory === "Downloaded")
-        return sound.isLocal || downloadedSounds.has(sound.id);
       return (
         selectedCategory === SOUND_CATEGORIES.ALL ||
         sound.category === selectedCategory
       );
     });
-  }, [selectedCategory, favorites, downloadedSounds]);
+  }, [selectedCategory, favorites]);
 
   const firstActiveSound = useMemo(() => {
     return activeSounds.size > 0 ? Array.from(activeSounds.values())[0] : null;
@@ -1821,15 +1770,6 @@ export default function SoundsScreen() {
             isSelected={selectedCategory === "Favourites"}
             theme={theme}
             onPress={() => handleSelectCategory("Favourites")}
-          />
-        )}
-        {downloadedSounds.size > 0 && (
-          <CategoryTab
-            category="Offline"
-            isSelected={selectedCategory === "Downloaded"}
-            theme={theme}
-            customColor="#10b981"
-            onPress={() => handleSelectCategory("Downloaded")}
           />
         )}
         {Object.values(SOUND_CATEGORIES).map((category) => (
@@ -1912,8 +1852,6 @@ export default function SoundsScreen() {
                   isActive={activeSounds.has(soundItem.id)}
                   isLoading={loadingSounds.has(soundItem.id)}
                   isFavorite={favorites.has(soundItem.id)}
-                  isDownloaded={downloadedSounds.has(soundItem.id)}
-                  isDownloading={downloadingStates.has(soundItem.id)}
                   isQuickPlayActive={
                     isQuickPlaying && favoriteSoundId === String(soundItem.id)
                   }
@@ -1924,7 +1862,6 @@ export default function SoundsScreen() {
                   scaledDescSize={scaledFontSizes.description}
                   onPress={handlePlaySound}
                   onFavorite={handleToggleFavorite}
-                  onDownload={handleDownloadSound}
                 />
               </View>
             )}

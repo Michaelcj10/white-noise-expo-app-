@@ -19,7 +19,7 @@ const REVENUECAT_CONFIG = {
     android: REVENUECAT_API_KEYS.android,
     ios: REVENUECAT_API_KEYS.ios,
   }) as string,
-  entitlementId: "drowse Pro", // Your entitlement identifier
+  entitlementIds: ["drowse Pro", "lifetime", "monthly", "yearly"], // Your entitlement identifiers
 };
 
 // Product identifiers for your offerings (from RevenueCat dashboard)
@@ -223,29 +223,46 @@ export const RevenueCatProvider = ({
     setCustomerInfo(info);
 
     // Debug: Log all active entitlements
+    const activeEntitlements = Object.keys(info.entitlements.active);
+    console.log("🔍 Active entitlements:", activeEntitlements);
     console.log(
-      "🔍 Active entitlements:",
-      Object.keys(info.entitlements.active),
+      "🔍 Looking for entitlements:",
+      REVENUECAT_CONFIG.entitlementIds,
     );
-    console.log("🔍 Looking for entitlement:", REVENUECAT_CONFIG.entitlementId);
 
-    // Check if user has active entitlement for "Drowse Pro"
-    const hasProAccess =
-      info.entitlements.active[REVENUECAT_CONFIG.entitlementId] !== undefined;
+    // Check if user has any of the pro entitlements (lifetime, monthly, yearly)
+    const hasProAccess = REVENUECAT_CONFIG.entitlementIds.some(
+      (entitlementId) =>
+        info.entitlements.active[entitlementId]?.isActive === true,
+    );
 
     console.log("🔍 hasProAccess result:", hasProAccess);
     console.log("🔍 Setting isPro to:", hasProAccess);
 
-    setIsPro(hasProAccess);
+    // Force state update by using callback form
+    setIsPro((prev) => {
+      if (prev !== hasProAccess) {
+        console.log("📱 isPro state changing from", prev, "to", hasProAccess);
+      }
+      return hasProAccess;
+    });
 
     if (hasProAccess) {
-      const entitlement =
-        info.entitlements.active[REVENUECAT_CONFIG.entitlementId];
-      console.log("✨ Pro access granted:", {
-        productIdentifier: entitlement.productIdentifier,
-        expirationDate: entitlement.expirationDate,
-        willRenew: entitlement.willRenew,
-      });
+      // Find which entitlement is active
+      const activeEntitlementId = REVENUECAT_CONFIG.entitlementIds.find(
+        (id) => info.entitlements.active[id]?.isActive === true,
+      );
+      const entitlement = activeEntitlementId
+        ? info.entitlements.active[activeEntitlementId]
+        : null;
+      if (entitlement) {
+        console.log("✨ Pro access granted:", {
+          entitlement: activeEntitlementId,
+          productIdentifier: entitlement.productIdentifier,
+          expirationDate: entitlement.expirationDate,
+          willRenew: entitlement.willRenew,
+        });
+      }
     } else {
       console.log("🔒 No pro access");
     }
@@ -268,36 +285,42 @@ export const RevenueCatProvider = ({
     } catch (error: any) {
       if (error.userCancelled) {
         console.log("❌ User cancelled purchase");
-        return { success: false };
+        return { success: false, error: "cancelled" };
       }
       console.error("❌ Error purchasing package:", error);
-      showToast(
-        error.message || "Unable to complete purchase. Please try again.",
-        "error",
-      );
-      return { success: false };
+      return {
+        success: false,
+        error:
+          error.message || "Unable to complete purchase. Please try again.",
+      };
     }
   };
 
-  const restorePurchases = async (): Promise<{ success: boolean }> => {
+  const restorePurchases = async (): Promise<{
+    success: boolean;
+    restoredPurchases: boolean;
+  }> => {
     try {
       console.log("🔄 Restoring purchases...");
       const info = await Purchases.restorePurchases();
       updateCustomerInfo(info);
 
-      const hasActiveEntitlement =
-        info.entitlements.active[REVENUECAT_CONFIG.entitlementId] !== undefined;
+      // Check if any of the pro entitlements are active
+      const hasActiveEntitlement = REVENUECAT_CONFIG.entitlementIds.some(
+        (entitlementId) =>
+          info.entitlements.active[entitlementId]?.isActive === true,
+      );
 
       if (hasActiveEntitlement) {
         console.log("✅ Purchases restored successfully");
-        return { success: true };
+        return { success: true, restoredPurchases: true };
       } else {
         console.log("ℹ️ No purchases to restore");
-        return { success: false };
+        return { success: false, restoredPurchases: false };
       }
     } catch (error: any) {
       console.error("❌ Error restoring purchases:", error);
-      return { success: false };
+      return { success: false, restoredPurchases: false };
     }
   };
 

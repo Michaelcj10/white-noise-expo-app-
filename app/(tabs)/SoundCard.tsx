@@ -42,8 +42,6 @@ export interface SoundCardProps {
   isActive: boolean;
   isLoading: boolean;
   isFavorite: boolean;
-  isDownloaded: boolean;
-  isDownloading: boolean;
   isQuickPlayActive: boolean;
   isPro: boolean;
   theme: Theme;
@@ -52,7 +50,6 @@ export interface SoundCardProps {
   scaledDescSize: number;
   onPress: (soundItem: SoundItem) => void;
   onFavorite: (soundId: number) => void;
-  onDownload: (soundItem: SoundItem) => void;
 }
 
 /* ---------- Component ---------- */
@@ -62,8 +59,6 @@ export const SoundCard = React.memo(
     isActive,
     isLoading,
     isFavorite,
-    isDownloaded,
-    isDownloading,
     isQuickPlayActive,
     isPro,
     theme,
@@ -72,7 +67,6 @@ export const SoundCard = React.memo(
     scaledDescSize,
     onPress,
     onFavorite,
-    onDownload,
   }: SoundCardProps) => {
     // Animation refs
     const cardScale = useRef(new Animated.Value(1)).current;
@@ -160,18 +154,7 @@ export const SoundCard = React.memo(
       [soundItem.id, heartScale, onFavorite],
     );
 
-    const handleDownloadPress = useCallback(
-      (e: any) => {
-        e.stopPropagation();
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        onDownload(soundItem);
-      },
-      [soundItem, onDownload],
-    );
-
     // Derived values
-    const showDownloadButton =
-      !soundItem.isLocal && !isDownloaded && (isPro || !soundItem.premium);
     const showProBadge = soundItem.premium && !isPro;
 
     return (
@@ -254,25 +237,6 @@ export const SoundCard = React.memo(
 
           {/* Action buttons */}
           <View style={styles.actionsContainer}>
-            {/* Download button */}
-            {showDownloadButton && (
-              <TouchableOpacity
-                onPress={handleDownloadPress}
-                style={styles.downloadButton}
-                disabled={isDownloading}
-              >
-                {isDownloading ? (
-                  <ActivityIndicator size="small" color={theme.primary} />
-                ) : (
-                  <Ionicons
-                    name="cloud-download-outline"
-                    size={20}
-                    color={theme.primary}
-                  />
-                )}
-              </TouchableOpacity>
-            )}
-
             {/* Pro badge or favorite button */}
             {showProBadge ? (
               <View
@@ -312,15 +276,13 @@ export const SoundCard = React.memo(
       prevProps.isActive === nextProps.isActive &&
       prevProps.isLoading === nextProps.isLoading &&
       prevProps.isFavorite === nextProps.isFavorite &&
-      prevProps.isDownloaded === nextProps.isDownloaded &&
-      prevProps.isDownloading === nextProps.isDownloading &&
       prevProps.isQuickPlayActive === nextProps.isQuickPlayActive &&
       prevProps.isPro === nextProps.isPro &&
       prevProps.theme === nextProps.theme &&
       prevProps.themeMode === nextProps.themeMode &&
       prevProps.scaledNameSize === nextProps.scaledNameSize &&
       prevProps.scaledDescSize === nextProps.scaledDescSize
-      // Note: callbacks (onPress, onFavorite, onDownload) are intentionally
+      // Note: callbacks (onPress, onFavorite) are intentionally
       // excluded - they should be memoized in the parent with useCallback
     );
   },
@@ -387,10 +349,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  downloadButton: {
-    padding: 8,
-    position: "relative",
   },
   proBadge: {
     paddingHorizontal: 10,
