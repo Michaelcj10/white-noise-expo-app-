@@ -7,19 +7,26 @@ import Purchases, {
   PurchasesPackage,
 } from "react-native-purchases";
 
+import Constants from "expo-constants";
 // RevenueCat Configuration
 // Project ID: projb5fc2109 (for dashboard reference)
-const REVENUECAT_API_KEYS = {
-  android: "test_RkRHTuKBoKajkGhzyZOvMnKaBkC",
-  ios: "test_RkRHTuKBoKajkGhzyZOvMnKaBkC", // Use same key for both platforms or add iOS key
+// Android production keys start with "goog_", iOS with "appl_"
+const REVENUECAT_CONFIG = {
+  apiKey:
+    Platform.select({
+      android: Constants.expoConfig?.extra?.revenueCatGoogleApiKey,
+      ios: Constants.expoConfig?.extra?.revenueCatIosApiKey,
+      default: "",
+    }) || "",
+  entitlementIds: ["drowse Pro", "lifetime", "monthly", "yearly"],
 };
 
-const REVENUECAT_CONFIG = {
-  apiKey: Platform.select({
-    android: REVENUECAT_API_KEYS.android,
-    ios: REVENUECAT_API_KEYS.ios,
-  }) as string,
-  entitlementIds: ["drowse Pro", "lifetime", "monthly", "yearly"], // Your entitlement identifiers
+// Helper to check if API key is valid
+const isValidApiKey = (key: string): boolean => {
+  if (!key || key.length === 0) return false;
+  if (key.includes("YOUR_PRODUCTION_KEY")) return false;
+  // Production keys must start with goog_ (Android) or appl_ (iOS)
+  return key.startsWith("goog_") || key.startsWith("appl_");
 };
 
 // Product identifiers for your offerings (from RevenueCat dashboard)
@@ -100,44 +107,40 @@ export const RevenueCatProvider = ({
 
   useEffect(() => {
     const initializePurchases = async () => {
-      // Skip RevenueCat initialization on web - SDK not supported on web
-      if (Platform.OS === "web") {
-        console.log(
-          "🌐 Web platform detected - RevenueCat SDK not available on web",
-        );
-        console.log(
-          "✈️  Operating in offline/free mode (web doesn't support native billing)",
-        );
-        setIsPro(false);
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        console.log(
-          `🚀 Starting RevenueCat initialization... (Attempt ${retryCount + 1}/${MAX_RETRIES + 1})`,
-        );
-        console.log("📱 Platform:", Platform.OS);
-        console.log(
-          "🔑 API Key:",
-          REVENUECAT_CONFIG.apiKey ? "✓ Present" : "✗ Missing",
-        );
+        // Skip RevenueCat initialization on web - SDK not supported on web
+        if (Platform.OS === "web") {
+          setIsPro(false);
+          setIsLoading(false);
+          return;
+        }
 
-        // Enable debug logs for development (set to ERROR for production)
-        Purchases.setLogLevel(LOG_LEVEL.DEBUG);
-        console.log("📝 Debug logging enabled");
+        // Check if API key is valid before attempting initialization
+        // Empty string or placeholder = skip initialization, run in free mode
+        const apiKey = REVENUECAT_CONFIG.apiKey;
+        if (
+          !apiKey ||
+          apiKey.length < 10 ||
+          (!apiKey.startsWith("goog_") && !apiKey.startsWith("appl_"))
+        ) {
+          // No valid production key - run in free mode (no crash)
+          setIsPro(false);
+          setIsLoading(false);
+          return;
+        }
 
-        // Configure Purchases with the API key
-        console.log("⚙️ Configuring Purchases with API key...");
+        // Configure Purchases with the API key first
         await Purchases.configure({
-          apiKey: REVENUECAT_CONFIG.apiKey,
+          apiKey: apiKey,
         });
 
-        console.log("✅ RevenueCat SDK initialized successfully");
+        // Enable debug logs AFTER configure (set to ERROR for production)
+        if (__DEV__) {
+          Purchases.setLogLevel(LOG_LEVEL.DEBUG);
+        }
 
         // Set up listener for purchase updates
         Purchases.addCustomerInfoUpdateListener((info) => {
-          console.log("📱 Customer info updated");
           updateCustomerInfo(info);
         });
 
@@ -150,10 +153,6 @@ export const RevenueCatProvider = ({
           const info = await Promise.race([infoPromise, timeoutPromise]);
           updateCustomerInfo(info as CustomerInfo);
         } catch (infoError) {
-          console.warn(
-            "⚠️ Could not fetch customer info (likely offline):",
-            infoError,
-          );
           // Offline mode: default to free tier, user can restore purchases when online
           setIsPro(false);
         }
@@ -171,29 +170,13 @@ export const RevenueCatProvider = ({
           const off = fetchedOfferings as any;
           if (off.current) {
             setOfferings(off.current);
-            console.log(
-              "📦 Loaded offerings:",
-              off.current.availablePackages.length,
-              "packages",
-            );
-          } else {
-            console.warn("⚠️ No current offering found");
           }
         } catch (offeringError) {
-          console.warn(
-            "⚠️ Could not fetch offerings (likely offline):",
-            offeringError,
-          );
           // Offline mode: offerings will be null, but app continues to work
         }
 
         setIsLoading(false);
       } catch (error: any) {
-        console.error("❌ Error initializing RevenueCat");
-        console.error("   Error type:", error?.name || typeof error);
-        console.error("   Error message:", error?.message || error);
-        console.error("   Full error:", error);
-
         // Retry logic for API key errors
         if (
           retryCount < MAX_RETRIES &&
@@ -201,16 +184,13 @@ export const RevenueCatProvider = ({
             error?.message?.includes("401") ||
             error?.message?.includes("Unauthorized"))
         ) {
-          console.log(
-            `⏳ Retrying initialization in 2 seconds... (${retryCount + 1}/${MAX_RETRIES})`,
-          );
           setTimeout(() => {
             setRetryCount(retryCount + 1);
           }, 2000);
           return;
         }
 
-        console.log("✈️  Operating in offline/free mode");
+        // Any error: fall back to free mode - NEVER leave isLoading=true
         setIsPro(false);
         setIsLoading(false);
       }
@@ -270,7 +250,7 @@ export const RevenueCatProvider = ({
 
   const purchasePackage = async (
     pkg: PurchasesPackage,
-  ): Promise<{ success: boolean }> => {
+  ): Promise<{ success: boolean; error?: string }> => {
     try {
       console.log("� Attempting purchase:", pkg.identifier);
       const { customerInfo: info } = await Purchases.purchasePackage(pkg);
@@ -324,6 +304,47 @@ export const RevenueCatProvider = ({
     }
   };
 
+  // Stub implementations for missing context methods
+  const presentPaywall = async (): Promise<{
+    purchased: boolean;
+    restored: boolean;
+  }> => {
+    setShowPaywall(true);
+    return { purchased: false, restored: false };
+  };
+
+  const presentPaywallIfNeeded = async (): Promise<{
+    purchased: boolean;
+    restored: boolean;
+  }> => {
+    if (!isPro) {
+      setShowPaywall(true);
+      return { purchased: false, restored: false };
+    }
+    return { purchased: false, restored: false };
+  };
+
+  const presentCustomerCenter = async (): Promise<void> => {
+    // Implement navigation to customer center if available
+    // For now, just log
+    console.log("presentCustomerCenter called");
+  };
+
+  const getActiveSubscriptionInfo = () => {
+    if (!customerInfo) return null;
+    const activeEntitlementId = REVENUECAT_CONFIG.entitlementIds.find(
+      (id) => customerInfo.entitlements.active[id]?.isActive === true,
+    );
+    if (!activeEntitlementId) return null;
+    const entitlement = customerInfo.entitlements.active[activeEntitlementId];
+    return {
+      productId: entitlement.productIdentifier ?? null,
+      expirationDate: entitlement.expirationDate ?? null,
+      willRenew: entitlement.willRenew ?? false,
+      periodType: entitlement.periodType ?? null,
+    };
+  };
+
   return (
     <RevenueCatContext.Provider
       value={{
@@ -335,6 +356,10 @@ export const RevenueCatProvider = ({
         restorePurchases,
         showPaywall,
         setShowPaywall,
+        presentPaywall,
+        presentPaywallIfNeeded,
+        presentCustomerCenter,
+        getActiveSubscriptionInfo,
       }}
     >
       {children}

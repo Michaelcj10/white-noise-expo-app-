@@ -54,7 +54,7 @@ import {
 } from "../../utils/audioNotification";
 
 // Import the extracted SoundCard component
-import { SoundCard, SoundItem, Theme } from "./SoundCard";
+import { SoundCard, SoundItem, Theme } from "@/components/SoundCard";
 
 /* ---------- Platform helpers ---------- */
 const isWeb = Platform.OS === "web";

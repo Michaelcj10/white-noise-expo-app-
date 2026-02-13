@@ -29,6 +29,12 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
     useRevenueCat();
   const [loading, setLoading] = useState(false);
 
+  // Force use of the 'drowseoffer' offering if available, else fallback to first available offering
+  const drowseOffering =
+    (offerings as any)?.drowseoffer ||
+    (offerings && Object.values(offerings)[0]);
+  const availablePackages = drowseOffering?.availablePackages || [];
+
   // Track when paywall is viewed
   useEffect(() => {
     if (visible) {
@@ -166,30 +172,35 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
             </View>
 
             {/* Pricing */}
-            {offerings?.availablePackages &&
-            offerings.availablePackages.length > 0 ? (
+            {availablePackages.length > 0 ? (
               <View style={styles.pricingContainer}>
                 {/* Main Pricing: Monthly and Yearly */}
                 <View style={styles.pricing}>
-                  {offerings.availablePackages
+                  {availablePackages
                     .filter(
-                      (pkg) =>
-                        pkg.packageType === "MONTHLY" ||
-                        pkg.packageType === "ANNUAL",
+                      (pkg: { identifier: string }) =>
+                        pkg.identifier === "drowse_pro:monthly" ||
+                        pkg.identifier === "drowse_pro:yearly",
                     )
-                    .sort((a, b) => {
-                      // Show ANNUAL first, then MONTHLY
-                      if (a.packageType === "ANNUAL") return -1;
-                      if (b.packageType === "ANNUAL") return 1;
-                      return 0;
-                    })
-                    .map((pkg) => {
-                      const isAnnual = pkg.packageType === "ANNUAL";
+                    .sort(
+                      (
+                        a: { identifier: string },
+                        b: { identifier: string },
+                      ) => {
+                        // Show yearly first, then monthly
+                        if (a.identifier === "drowse_pro:yearly") return -1;
+                        if (b.identifier === "drowse_pro:yearly") return 1;
+                        return 0;
+                      },
+                    )
+                    .map((pkg: PurchasesPackage) => {
+                      const isYearly = pkg.identifier === "drowse_pro:yearly";
                       // Calculate savings for yearly
-                      const monthlyCost =
-                        offerings.availablePackages.find(
-                          (p) => p.packageType === "MONTHLY",
-                        )?.product.price || 0;
+                      const monthlyPkg = availablePackages.find(
+                        (p: { identifier: string }) =>
+                          p.identifier === "drowse_pro:monthly",
+                      );
+                      const monthlyCost = monthlyPkg?.product.price || 0;
                       const yearlyCost = pkg.product.price || 0;
                       const monthlySavings = (
                         ((monthlyCost * 12 - yearlyCost) / (monthlyCost * 12)) *
@@ -202,12 +213,12 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                           style={[
                             styles.priceButton,
                             { backgroundColor: theme.primary },
-                            isAnnual && styles.bestValueButton,
+                            isYearly && styles.bestValueButton,
                           ]}
                           onPress={() => handlePurchase(pkg)}
                           disabled={loading}
                         >
-                          {isAnnual && (
+                          {isYearly && (
                             <View style={styles.savingsBadge}>
                               <Text style={styles.savingsText}>
                                 Save {monthlySavings}%
@@ -219,13 +230,13 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                           ) : (
                             <>
                               <Text style={styles.priceTitle}>
-                                {isAnnual ? "Yearly" : "Monthly"}
+                                {isYearly ? "Yearly" : "Monthly"}
                               </Text>
                               <Text style={styles.priceAmount}>
                                 {pkg.product.priceString}
                               </Text>
                               <Text style={styles.priceSubtext}>
-                                {isAnnual
+                                {isYearly
                                   ? "per year"
                                   : `${(pkg.product.price / 12).toFixed(
                                       2,
@@ -239,7 +250,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                 </View>
 
                 {/* Lifetime Option (Secondary CTA - Slightly Hidden) */}
-                {offerings.availablePackages.find(
+                {offerings?.availablePackages?.find(
                   (pkg) => pkg.packageType === "LIFETIME",
                 ) && (
                   <View style={styles.lifetimeSection}>
@@ -258,7 +269,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                       ]}
                       onPress={() =>
                         handlePurchase(
-                          offerings.availablePackages.find(
+                          offerings?.availablePackages?.find(
                             (pkg) => pkg.packageType === "LIFETIME",
                           )!,
                         )
@@ -284,7 +295,7 @@ export function PaywallModal({ visible, onClose }: PaywallModalProps) {
                             ]}
                           >
                             {
-                              offerings.availablePackages.find(
+                              offerings?.availablePackages?.find(
                                 (pkg) => pkg.packageType === "LIFETIME",
                               )?.product.priceString
                             }

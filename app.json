@@ -5,6 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0903"
+    },
     "scheme": "drowse",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -18,7 +23,7 @@
     },
     "android": {
       "package": "com.drowse.whitenoiseapp",
-      "versionCode": 7,
+      "versionCode": 13,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-foreground.png",
         "backgroundColor": "#0A0903"
@@ -42,7 +47,6 @@
           "resizeMode": "contain",
           "backgroundColor": "#0A0903",
           "dark": {
-            "image": "./assets/images/splash.png",
             "backgroundColor": "#0A0903"
           }
         }
